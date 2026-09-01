@@ -1,0 +1,6 @@
+* text=auto
+*.json text eol=lf
+*.luau text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.rbxmx -text

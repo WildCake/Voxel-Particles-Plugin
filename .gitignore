@@ -1,0 +1,24 @@
+# This directory also contains historical game experiments and raw media.
+# The public repository intentionally exposes only the standalone plugin project.
+/*
+
+!/.agents/
+!/.gitattributes
+!/.gitignore
+!/AGENTS.md
+!/CHANGELOG.md
+!/LESSONS.md
+!/README.md
+!/PLUGIN_EXPORT_CORE/
+!/dist/
+!/plugin-package.json
+!/plugin-sourcemap.json
+!/tools/
+
+/dist/*
+!/dist/VoxelParticlesPlugin-v12.rbxmx
+
+__pycache__/
+*.py[cod]
+*.bak
+*.tmp

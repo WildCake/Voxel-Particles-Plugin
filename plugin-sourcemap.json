@@ -1,0 +1,158 @@
+{
+  "name": "VoxelParticlesPluginPackage",
+  "className": "DataModel",
+  "filePaths": [],
+  "children": [
+    {
+      "name": "VoxelParticlesPlugin",
+      "className": "Script",
+      "filePaths": [
+        "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/init.legacy.luau"
+      ],
+      "children": [
+        {
+          "name": "Internal",
+          "className": "Folder",
+          "filePaths": [],
+          "children": [
+            {
+              "name": "VoxelParticleSystem",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/VoxelParticleSystem.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "ClientVfxQuality",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/ClientVfxQuality.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "VoxelEmitterBinderTemplate",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/VoxelEmitterBinderTemplate.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "VoxelFairShareAllocator",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/VoxelFairShareAllocator.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "VoxelMotionIntegrator",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/VoxelMotionIntegrator.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "VoxelCylinderStream",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/VoxelCylinderStream.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "RuntimeInstaller",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/RuntimeInstaller.luau"
+              ],
+              "children": []
+            },
+            {
+              "name": "BundledPresets",
+              "className": "Folder",
+              "filePaths": [],
+              "children": [
+                {
+                  "name": "Default",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Default.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Firethrower",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Firethrower.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_1",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_1.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_2",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_2.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_3",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_3.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_4",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_4.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Portal",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Portal.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "SimpleFire",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/SimpleFire.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Teleport",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Teleport.luau"
+                  ],
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "pluginName": "VoxelParticlesPlugin",
+  "pluginVersion": 12,
+  "runtimeVersion": 12,
+  "installerVersion": 4,
+  "sourceRoot": "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin",
+  "entrySource": "init.legacy.luau",
+  "internalModules": [
+    "VoxelParticleSystem",
+    "ClientVfxQuality",
+    "VoxelEmitterBinderTemplate",
+    "VoxelFairShareAllocator",
+    "VoxelMotionIntegrator",
+    "VoxelCylinderStream",
+    "RuntimeInstaller"
+  ],
+  "bundledPresets": [
+    "Default",
+    "Firethrower",
+    "Landing_1",
+    "Landing_2",
+    "Landing_3",
+    "Landing_4",
+    "Portal",
+    "SimpleFire",
+    "Teleport"
+  ]
+}
