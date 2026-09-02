@@ -1,5 +1,20 @@
 # Changelog
 
+## v13 — 2026-09-02
+
+### Fixed
+
+- Fresh editor preview clones now retain the preset's authored parent while bypassing the `require()` cache, so presets can resolve sibling modules through `script.Parent`.
+
+### Changed
+
+- Plugin version is 13; the bundled runtime remains 12 and RuntimeInstaller remains 4.
+- The repository skill and release validation now enforce parent-preserving fresh preset evaluation.
+
+Release artifact: `dist/VoxelParticlesPlugin-v13.rbxmx`
+
+SHA-256: `3ef608739c2b010c907c1a2decdd2a54f52934a91b8a873b2c37c89df953bc23`
+
 ## v12 — 2026-09-02
 
 ### Added

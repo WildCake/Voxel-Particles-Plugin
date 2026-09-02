@@ -37,6 +37,7 @@ Native Script Sync owns mapped project source. RuntimeInstaller may inspect it b
 - Annulus sampling stays uniform by area and accepts only equal positive X/Z outer radii with `0 <= inner < outer`.
 - Radial direction modes use the actual sampled offset. A zero offset retains emission-axis behavior.
 - Invalid editor state is rejected before configuring a live preview emitter.
+- Fresh editor evaluation may clone a preset to bypass `require()` caching, but the clone must keep the authored parent during `require()` and be destroyed immediately afterward. Never detach it: presets may legitimately resolve sibling defaults or helpers through `script.Parent`.
 - Required modules and the `Default` preset must exist in both the manifest and final `.rbxmx` hierarchy.
 
 ## Release workflow

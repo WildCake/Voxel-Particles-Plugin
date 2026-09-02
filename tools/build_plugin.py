@@ -312,6 +312,7 @@ def validate_sources(
                 '"radialOutward"',
                 '"radialTangent"',
                 "spawnInnerRadius = state.spawnInnerRadius",
+                "clone.Parent = module.Parent",
             ),
         ),
         "VoxelParticleSystem": (

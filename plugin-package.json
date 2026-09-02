@@ -1,6 +1,6 @@
 {
   "pluginName": "VoxelParticlesPlugin",
-  "pluginVersion": 12,
+  "pluginVersion": 13,
   "runtimeVersion": 12,
   "installerVersion": 4,
   "sourceRoot": "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin",

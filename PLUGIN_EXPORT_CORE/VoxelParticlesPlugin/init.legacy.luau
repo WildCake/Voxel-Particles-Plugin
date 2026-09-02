@@ -47,7 +47,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 12
+local PLUGIN_VERSION = 13
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -2587,11 +2587,10 @@ local function rebuildPanel(state)
 	finishPicker:SetColor(state.colorCurve.finish)
 end
 
--- VoxelParticlesPlugin.lua
--- ВАЖНО: используем :Clone() чтобы обойти кэш require
+-- Clone to bypass require() caching while preserving the authored module context.
 local function requirePresetModuleFresh(module: ModuleScript)
 	local clone = module:Clone()
-	clone.Parent = nil
+	clone.Parent = module.Parent
 	local ok, data = pcall(function()
 		return require(clone)
 	end)

@@ -2,17 +2,22 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v12
+## Download v13
 
-[Download `VoxelParticlesPlugin-v12.rbxmx`](dist/VoxelParticlesPlugin-v12.rbxmx)
+[Download `VoxelParticlesPlugin-v13.rbxmx`](dist/VoxelParticlesPlugin-v13.rbxmx)
 
-SHA-256: `e5703849b2d1df54a674b62d5dfb30f1be987536ea5aff61b7941332c082cf2d`
+SHA-256: `3ef608739c2b010c907c1a2decdd2a54f52934a91b8a873b2c37c89df953bc23`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v12**, then use **Initialize/Update project** to install the reviewed runtime and bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v13**, then use **Initialize/Update project** to install the reviewed runtime and bundled presets.
 
 If a target project uses native Script Sync, its mapped disk files remain authoritative. The plugin reports the conflict and intentionally does not overwrite those sources.
 
-## What's new in v12
+## What's new in v13
+
+- Fresh editor preview still clones presets to bypass `require()` caching, but now keeps their authored parent during evaluation. Presets can safely resolve sibling defaults and helpers through `script.Parent`.
+- The bundled runtime remains v12 and RuntimeInstaller remains v4; this release changes only the plugin editor and its engineering contract.
+
+## v12 runtime highlights
 
 - `ClientVfxQuality` provides one shared `Minimum`/`Low`/`Medium`/`High` client VFX tier. Roblox saved graphics quality sets the ceiling; sustained frame pressure can lower it, and stable performance recovers it gradually.
 - `spawnDirectionMode` supports `emission`, `radialOutward`, and `radialTangent` velocity.
@@ -55,7 +60,7 @@ Python 3 is required. The builder preserves non-source Roblox metadata from an e
 ```powershell
 python -B tools/build_plugin.py `
   --template "$env:LOCALAPPDATA\Roblox\Plugins\VoxelParticlesPlugin.rbxmx" `
-  --output "dist\VoxelParticlesPlugin-v12.rbxmx"
+  --output "dist\VoxelParticlesPlugin-v13.rbxmx"
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release details and [AGENTS.md](AGENTS.md) for repository engineering rules.
