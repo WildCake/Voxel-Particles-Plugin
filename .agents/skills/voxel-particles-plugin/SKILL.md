@@ -59,6 +59,10 @@ When public behavior or package membership changes:
 6. Inspect the final XML hierarchy, manifest membership, version markers, artifact hash, and focused diff.
 7. Update `CHANGELOG.md` and README download/install details.
 
+Load and verify the reviewed artifact in Studio, then publish a Creator Store release from the selected root plugin script by overwriting the existing plugin asset; creating a new asset breaks the installed users' update path. Do not upload the generated XML through Open Cloud. Roblox Studio owns **Manage Plugins**, individual/**Update All**, and **Auto Update**. The plugin's own install/update control changes only the open project's bundled runtime and must not download or replace the Studio plugin.
+
+For a local development install, close every Studio process and replace only `%LOCALAPPDATA%\Roblox\Plugins\VoxelParticlesPlugin.rbxmx`. Keep no version-suffixed `.rbxmx` sibling and do not enable a local copy beside a Creator Store copy. Never install or overwrite the template as part of the build command.
+
 Studio runtime or visual testing requires explicit authorization and an installed candidate. Use only official Roblox Studio MCP, keep native-synced source disk-owned, and return Studio to Edit after an authorized test.
 
 ## Handoff

@@ -1,5 +1,21 @@
 # Changelog
 
+## v15 — 2026-09-05
+
+### Changed
+
+- Project runtime controls now state explicitly that they install or update code in the open project, not the Studio plugin.
+- Creator Store publishing, Studio-managed updates, local `.rbxmx` replacement, and duplicate-copy prevention are documented as separate workflows.
+- Plugin version is 15; the bundled runtime remains 13 and RuntimeInstaller remains 5.
+
+### Security
+
+- Plugin updates remain owned by Roblox Studio. Voxel Particles does not request HTTP access or execute a custom self-updater.
+
+Release artifact: `dist/VoxelParticlesPlugin-v15.rbxmx`
+
+SHA-256: `c406e567327d23c4ada15ddb09f51e1d1300c07ae4a9e1e53378792618ac8237`
+
 ## v14 — 2026-09-04
 
 ### Added
