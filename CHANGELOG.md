@@ -1,5 +1,19 @@
 # Changelog
 
+## v15 — 2026-09-05
+
+### Fixed
+
+- Fresh preset-evaluation clones are excluded from the live `ChildAdded` and `ChildRemoved` registry while retaining their authored parent, preventing recursive self-registration, maximum event re-entrancy, and C stack overflow when a preset changes.
+
+### Changed
+
+- Plugin version is 15; the bundled runtime remains 13 and RuntimeInstaller remains 5.
+
+Release artifact: `dist/VoxelParticlesPlugin-v15.rbxmx`
+
+SHA-256: `1e179d373cc9685671d0947c4753c8e00fb8cf32d89981c914f37afbebcef4b8`
+
 ## v14 — 2026-09-04
 
 ### Added

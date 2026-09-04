@@ -2,23 +2,21 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v14
+## Download v15
 
-[Download `VoxelParticlesPlugin-v14.rbxmx`](dist/VoxelParticlesPlugin-v14.rbxmx)
+[Download `VoxelParticlesPlugin-v15.rbxmx`](dist/VoxelParticlesPlugin-v15.rbxmx)
 
-SHA-256: `3beb0200543c707e0a6bd80aba178931882a8f500cd39a741571895119a56206`
+SHA-256: `1e179d373cc9685671d0947c4753c8e00fb8cf32d89981c914f37afbebcef4b8`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v14**, then use **Initialize/Update project** to install the reviewed runtime and bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v15**, then use **Initialize/Update project** to install the reviewed runtime and bundled presets.
 
 If a target project uses native Script Sync, its mapped disk files remain authoritative. The plugin reports the conflict and intentionally does not overwrite those sources.
 
-## What's new in v14
+## What's new in v15
 
-- `spawnShape = "cubicBezier"` emits across the full length of a four-point cubic Bézier curve instead of clustering in high-parameter-speed sections.
-- `spawnDirectionMode = "curveNormal"` sends particles away from the curve in a uniformly random direction around its local tangent.
-- `Emitter:SetCubicBezier(p0, p1, p2, p3)` updates a moving curve through one reusable 64-segment arc-length table without recreating the emitter or allocating new tables each frame.
-- The editor exposes all four anchor-local control points, validates curve configuration, and previews the new shape and direction mode.
-- The bundled runtime is v13 and RuntimeInstaller is v5 so project updates install the required `VoxelCubicBezier` runtime sibling atomically.
+- Fresh preset-evaluation clones stay parented beside their authored module for valid `script.Parent` lookups, but the live preset registry now ignores those transient clones.
+- Editing or saving a preset no longer recursively handles its evaluation clone through `ChildAdded`/`ChildRemoved`, preventing event re-entrancy and C stack overflow.
+- This is an editor-only fix; the bundled runtime remains v13 and RuntimeInstaller remains v5.
 
 ## Runtime highlights
 
@@ -68,7 +66,7 @@ Python 3 is required. The builder preserves non-source Roblox metadata from an e
 ```powershell
 python -B tools/build_plugin.py `
   --template "$env:LOCALAPPDATA\Roblox\Plugins\VoxelParticlesPlugin.rbxmx" `
-  --output "dist\VoxelParticlesPlugin-v14.rbxmx"
+  --output "dist\VoxelParticlesPlugin-v15.rbxmx"
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release details and [AGENTS.md](AGENTS.md) for repository engineering rules.

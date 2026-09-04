@@ -48,7 +48,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 14
+local PLUGIN_VERSION = 15
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -2647,13 +2647,17 @@ local function rebuildPanel(state)
 end
 
 -- Clone to bypass require() caching while preserving the authored module context.
+local transientPresetModules: {[ModuleScript]: boolean} = {}
+
 local function requirePresetModuleFresh(module: ModuleScript)
 	local clone = module:Clone()
+	transientPresetModules[clone] = true
 	clone.Parent = module.Parent
 	local ok, data = pcall(function()
 		return require(clone)
 	end)
 	clone:Destroy()
+	transientPresetModules[clone] = nil
 	return ok, data
 end
 
@@ -3679,12 +3683,12 @@ bindPresetFolder = function(folder)
 		end
 	end
 	table.insert(presetFolderConnections, folder.ChildAdded:Connect(function(child)
-		if child:IsA("ModuleScript") then
+		if child:IsA("ModuleScript") and not transientPresetModules[child] then
 			registerPresetModule(child)
 		end
 	end))
 	table.insert(presetFolderConnections, folder.ChildRemoved:Connect(function(child)
-		if child:IsA("ModuleScript") then
+		if child:IsA("ModuleScript") and not transientPresetModules[child] then
 			unregisterPresetModule(child)
 		end
 	end))
