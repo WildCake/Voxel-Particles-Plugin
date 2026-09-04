@@ -43,11 +43,12 @@ local bindPresetFolder
 local presetsFolder = nil
 
 local Internal = script:WaitForChild("Internal")
+local VoxelCubicBezier = require(Internal:WaitForChild("VoxelCubicBezier"))
 local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 13
+local PLUGIN_VERSION = 14
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -73,6 +74,7 @@ local SHAPES = {
 	"square",
 	"star5",
 	"star7",
+	"cubicBezier",
 }
 
 local SHAPE_DISPLAY_NAMES: {[string]: string} = {
@@ -87,18 +89,21 @@ local SHAPE_DISPLAY_NAMES: {[string]: string} = {
 	square = "Square",
 	star5 = "Star (5-point)",
 	star7 = "Star (7-point)",
+	cubicBezier = "Cubic Bezier curve",
 }
 
 local DIRECTION_MODES = {
 	"emission",
 	"radialOutward",
 	"radialTangent",
+	"curveNormal",
 }
 
 local DIRECTION_MODE_DISPLAY_NAMES: {[string]: string} = {
 	emission = "Emission axis",
 	radialOutward = "Radial outward",
 	radialTangent = "Radial tangent",
+	curveNormal = "Curve normal",
 }
 
 local SAVE_COLOR = Color3.fromRGB(80, 170, 110)
@@ -209,6 +214,12 @@ local function defaultState()
 		spawnInnerRadius = 0,
 		spawnSurfaceOnly = false,
 		distanceSpeedFactor = 0,
+		cubicBezierPoints = {
+			Vector3.new(0, 0, 0),
+			Vector3.new(0, 2, 0),
+			Vector3.new(2, 4, 0),
+			Vector3.new(2, 6, 0),
+		},
 
 		perParticle = {
 			speed = {min = 6, max = 10},
@@ -313,8 +324,11 @@ end
 local function validateSpawnState(state)
 	local directionMode = state.spawnDirectionMode
 	assert(
-		directionMode == "emission" or directionMode == "radialOutward" or directionMode == "radialTangent",
-		"Spawn direction mode must be Emission axis, Radial outward, or Radial tangent"
+		directionMode == "emission"
+			or directionMode == "radialOutward"
+			or directionMode == "radialTangent"
+			or directionMode == "curveNormal",
+		"Spawn direction mode must be Emission axis, Radial outward, Radial tangent, or Curve normal"
 	)
 	assert(typeof(state.spawnSize) == "Vector3", "Spawn size must be a Vector3")
 	local innerRadius = tonumber(state.spawnInnerRadius)
@@ -329,8 +343,18 @@ local function validateSpawnState(state)
 			outerX > 0 and outerX < math.huge and math.abs(outerX - outerZ) <= 1e-4 and innerRadius < outerX,
 			"Annulus requires equal positive Spawn size X/Z and an inner radius smaller than them"
 		)
+	elseif state.spawnShape == "cubicBezier" then
+		local points = state.cubicBezierPoints
+		assert(typeof(points) == "table" and #points == 4, "Cubic Bezier requires exactly four control points")
+		for index = 1, 4 do
+			assert(typeof(points[index]) == "Vector3", ("Cubic Bezier point %d must be a Vector3"):format(index - 1))
+		end
+		VoxelCubicBezier.Build(points[1], points[2], points[3], points[4])
 	elseif state.spawnShape == "cylinderStream" then
 		assert(directionMode == "emission", "Cylinder stream requires Emission axis direction mode")
+	end
+	if directionMode == "curveNormal" then
+		assert(state.spawnShape == "cubicBezier", "Curve normal direction mode requires Cubic Bezier spawn shape")
 	end
 end
 
@@ -348,6 +372,7 @@ local function buildConfig(state)
 		spawnInnerRadius = state.spawnInnerRadius,
 		spawnSurfaceOnly = state.spawnSurfaceOnly,
 		distanceSpeedFactor = state.distanceSpeedFactor,
+		cubicBezierPoints = deepCopy(state.cubicBezierPoints),
 
 		perParticle = deepCopy(state.perParticle),
 		perParticleCurves = deepCopy(state.perParticleCurves),
@@ -2303,8 +2328,15 @@ local function rebuildPanel(state)
 			return
 		end
 		local idx = math.clamp(math.floor(v + 0.5), 1, #SHAPES)
-		state.spawnShape = SHAPES[idx]
+		local nextShape = SHAPES[idx]
+		state.spawnShape = nextShape
+		if nextShape == "cubicBezier" then
+			state.spawnDirectionMode = "curveNormal"
+		elseif state.spawnDirectionMode == "curveNormal" then
+			state.spawnDirectionMode = "emission"
+		end
 		scheduleApply()
+		rebuildPanel(state)
 	end, function(v)
 		if #SHAPES == 0 then
 			return "-"
@@ -2339,6 +2371,33 @@ local function rebuildPanel(state)
 		state.spawnSurfaceOnly = value
 		scheduleApply()
 	end)
+	if state.spawnShape == "cubicBezier" then
+		createSubLabel(
+			emission,
+			"Cubic Bezier points are local to the emitter. P0/P3 are endpoints; P1/P2 shape the curve.",
+			true
+		)
+		local function addCurvePointSlider(pointIndex, axis)
+			local point = state.cubicBezierPoints[pointIndex]
+			local value = if axis == "X" then point.X elseif axis == "Y" then point.Y else point.Z
+			createSlider(emission, ("Curve P%d %s"):format(pointIndex - 1, axis), -50, 50, value, 0.1, function(v)
+				local current = state.cubicBezierPoints[pointIndex]
+				if axis == "X" then
+					state.cubicBezierPoints[pointIndex] = Vector3.new(v, current.Y, current.Z)
+				elseif axis == "Y" then
+					state.cubicBezierPoints[pointIndex] = Vector3.new(current.X, v, current.Z)
+				else
+					state.cubicBezierPoints[pointIndex] = Vector3.new(current.X, current.Y, v)
+				end
+				scheduleApply()
+			end, formatFloat)
+		end
+		for pointIndex = 1, 4 do
+			addCurvePointSlider(pointIndex, "X")
+			addCurvePointSlider(pointIndex, "Y")
+			addCurvePointSlider(pointIndex, "Z")
+		end
+	end
 
 	local speedSection = createSection("Speed & Size", false)
 	local speedContent = speedSection:GetContent()
@@ -2386,7 +2445,7 @@ local function rebuildPanel(state)
 	end)
 	createSubLabel(
 		movement,
-		"Radial modes derive velocity from each sampled spawn position; Emission axis uses the configured direction below.",
+		"Radial modes use the sampled offset. Curve normal sends particles away around the curve tangent. Emission axis uses the direction below.",
 		true
 	)
 	createSlider(movement, "Emission direction X", -10, 10, state.emissionDirection.X, 0.05, function(v)

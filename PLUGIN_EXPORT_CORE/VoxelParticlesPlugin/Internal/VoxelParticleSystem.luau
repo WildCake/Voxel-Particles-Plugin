@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 12
+-- version 13
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
+local VoxelCubicBezier = require(script.Parent:WaitForChild("VoxelCubicBezier"))
 local VoxelCylinderStream = require(script.Parent:WaitForChild("VoxelCylinderStream"))
 local VoxelFairShareAllocator = require(script.Parent:WaitForChild("VoxelFairShareAllocator"))
 local VoxelMotionIntegrator = require(script.Parent:WaitForChild("VoxelMotionIntegrator"))
@@ -345,14 +346,20 @@ local DEFAULT_CONFIG = {
 	burstCount = 0,
 	maxParticles = 128,
 	emissionDirection = Vector3.new(0, 1, 0),
-	spawnDirectionMode = "emission", -- "emission", "radialOutward", or "radialTangent"
+	spawnDirectionMode = "emission", -- "emission", "radialOutward", "radialTangent", or "curveNormal"
 
 	-- новая спавн-геометрия
-	spawnShape = "point",                -- also supports "cylinderStream" for a straight boundary-to-boundary flow
+	spawnShape = "point",                -- also supports "cylinderStream" and "cubicBezier"
 	spawnSize  = Vector3.new(0,0,0),     -- полуразмеры для всех форм; для "ring"/"annulus" — радиусы по локальным X/Z
 	spawnInnerRadius = 0,                -- абсолютный внутренний радиус только для плоского "annulus"
 	spawnSurfaceOnly = false,            -- если true: для 3D форм спавним по поверхности, а не по объёму
 	distanceSpeedFactor = 0,
+	cubicBezierPoints = {
+		Vector3.new(0, 0, 0),
+		Vector3.new(0, 2, 0),
+		Vector3.new(2, 4, 0),
+		Vector3.new(2, 6, 0),
+	},
 	cylinderStreamAxis = Vector3.new(0, 1, 0),
 	cylinderStreamRadius = 1,
 	cylinderStreamHalfHeight = 1,
@@ -1550,8 +1557,9 @@ function Emitter:_applyConfig(config)
 	assert(
 		self.spawnDirectionMode == "emission"
 			or self.spawnDirectionMode == "radialOutward"
-			or self.spawnDirectionMode == "radialTangent",
-		"spawnDirectionMode must be emission, radialOutward, or radialTangent"
+			or self.spawnDirectionMode == "radialTangent"
+			or self.spawnDirectionMode == "curveNormal",
+		"spawnDirectionMode must be emission, radialOutward, radialTangent, or curveNormal"
 	)
 
 	-- новая геометрия
@@ -1569,6 +1577,20 @@ function Emitter:_applyConfig(config)
 			)
 		end
 		self._spawnMaxExtent = math.max(sx, math.max(sy, sz))
+	end
+	if self.spawnShape == "cubicBezier" then
+		local points = merged.cubicBezierPoints
+		assert(typeof(points) == "table" and #points == 4, "cubicBezierPoints must contain exactly four Vector3 values")
+		for index = 1, 4 do
+			assert(typeof(points[index]) == "Vector3", ("cubicBezierPoints[%d] must be a Vector3"):format(index))
+		end
+		local lut = VoxelCubicBezier.Build(points[1], points[2], points[3], points[4])
+		self.cubicBezierPoints = table.clone(points)
+		self._cubicBezierLut = lut
+		self._spawnMaxExtent = VoxelCubicBezier.MaxControlExtent(lut)
+	else
+		self.cubicBezierPoints = nil
+		self._cubicBezierLut = nil
 	end
 	self.distanceSpeedFactor = math.clamp(tonumber(merged.distanceSpeedFactor) or 0, -10, 10)
 	do
@@ -1739,6 +1761,10 @@ function Emitter:_applyConfig(config)
 			and (not self.curves.steerPitch or (self.curves.steerPitch[1]==1 and self.curves.steerPitch[2]==1 and self.curves.steerPitch[3]==1))
 			and (not self.curves.steerRoll  or (self.curves.steerRoll[1]==1 and self.curves.steerRoll[2]==1 and self.curves.steerRoll[3]==1)))
 
+	if self.spawnDirectionMode == "curveNormal" then
+		assert(self.spawnShape == "cubicBezier", "curveNormal direction mode requires cubicBezier spawn shape")
+	end
+
 	if self.spawnShape == "cylinderStream" then
 		assert(self.spawnDirectionMode == "emission", "cylinderStream requires emission direction mode")
 		local globalSpeed = self.globalSpeedCurve
@@ -1845,6 +1871,7 @@ function Emitter:_spawnOne(isExplicitBurst: boolean?): boolean
 	}
 	local offset
 	local streamTravelDistance
+	local curveTangent
 	if self.spawnShape == "cylinderStream" then
 		local worldAxis = anchor.CFrame:VectorToWorldSpace(self.cylinderStreamAxis)
 		offset, streamTravelDistance = VoxelCylinderStream.Sample(
@@ -1855,6 +1882,13 @@ function Emitter:_spawnOne(isExplicitBurst: boolean?): boolean
 			_p_next01(offsetState),
 			_p_next_open01(offsetState)
 		)
+	elseif self.spawnShape == "cubicBezier" then
+		local localOffset, localTangent = VoxelCubicBezier.Sample(
+			self._cubicBezierLut,
+			_p_next01(offsetState)
+		)
+		offset = anchor.CFrame:VectorToWorldSpace(localOffset)
+		curveTangent = anchor.CFrame:VectorToWorldSpace(localTangent).Unit
 	else
 		offset = _spawnOffset(
 			self.spawnShape,
@@ -1892,7 +1926,12 @@ function Emitter:_spawnOne(isExplicitBurst: boolean?): boolean
 		local minA = math.clamp(math.rad(ranges.angleMin), 0, math.pi)
 		local maxA = math.clamp(math.rad(ranges.angleMax), 0, math.pi)
 		if minA > maxA then minA, maxA = maxA, minA end
-		if radialMagnitude > 1e-6 and self.spawnDirectionMode == "radialOutward" then
+		if self.spawnDirectionMode == "curveNormal" then
+			local _, normal, bitangent = _basisFromDir(curveTangent)
+			local normalAngle = _p_next_number(_tmpState, 0, math.pi * 2)
+			local normalDirection = (normal * math.cos(normalAngle) + bitangent * math.sin(normalAngle)).Unit
+			return _sampleConeDirection(normalDirection, minA, maxA, _tmpState)
+		elseif radialMagnitude > 1e-6 and self.spawnDirectionMode == "radialOutward" then
 			return _sampleConeDirection(radial / radialMagnitude, minA, maxA, _tmpState)
 		elseif radialMagnitude > 1e-6 and self.spawnDirectionMode == "radialTangent" then
 			local radialDirection = radial / radialMagnitude
@@ -2495,6 +2534,17 @@ end
 
 function Emitter:Configure(config)
 	self:_applyConfig(config)
+end
+
+function Emitter:SetCubicBezier(p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3)
+	assert(self.spawnShape == "cubicBezier", "SetCubicBezier requires cubicBezier spawn shape")
+	local lut = VoxelCubicBezier.Rebuild(self._cubicBezierLut, p0, p1, p2, p3)
+	self.cubicBezierPoints[1] = p0
+	self.cubicBezierPoints[2] = p1
+	self.cubicBezierPoints[3] = p2
+	self.cubicBezierPoints[4] = p3
+	self._cubicBezierLut = lut
+	self._spawnMaxExtent = VoxelCubicBezier.MaxControlExtent(lut)
 end
 
 function Emitter:GetRateNoiseSample(): number

@@ -56,6 +56,14 @@
               "children": []
             },
             {
+              "name": "VoxelCubicBezier",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/VoxelCubicBezier.luau"
+              ],
+              "children": []
+            },
+            {
               "name": "VoxelCylinderStream",
               "className": "ModuleScript",
               "filePaths": [

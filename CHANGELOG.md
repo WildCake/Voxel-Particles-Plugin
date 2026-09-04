@@ -1,5 +1,24 @@
 # Changelog
 
+## v14 — 2026-09-04
+
+### Added
+
+- Uniform-distance `cubicBezier` emission across four anchor-local control points.
+- `curveNormal` velocity for particles that disperse around the curve tangent.
+- Allocation-free `Emitter:SetCubicBezier(p0, p1, p2, p3)` updates for animated curves.
+- Complete editor controls and validation for cubic Bézier emitters.
+
+### Changed
+
+- Plugin version is 14, bundled runtime is 13, and RuntimeInstaller is 5.
+- Runtime installation now includes the required `VoxelCubicBezier` sibling module.
+- The 64-segment arc-length lookup bounds sampling cost while avoiding visible particle clumps and gaps along curved emitters.
+
+Release artifact: `dist/VoxelParticlesPlugin-v14.rbxmx`
+
+SHA-256: `3beb0200543c707e0a6bd80aba178931882a8f500cd39a741571895119a56206`
+
 ## v13 — 2026-09-02
 
 ### Fixed

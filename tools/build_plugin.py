@@ -301,6 +301,7 @@ def validate_sources(
     runtime_version = manifest["runtimeVersion"]
     installer_version = manifest["installerVersion"]
     vps = internal_sources["VoxelParticleSystem"]
+    cubic_bezier = internal_sources["VoxelCubicBezier"]
     quality = internal_sources["ClientVfxQuality"]
     installer = internal_sources["RuntimeInstaller"]
     required_markers = {
@@ -311,7 +312,10 @@ def validate_sources(
                 '"annulus"',
                 '"radialOutward"',
                 '"radialTangent"',
+                '"cubicBezier"',
+                '"curveNormal"',
                 "spawnInnerRadius = state.spawnInnerRadius",
+                "cubicBezierPoints = deepCopy(state.cubicBezierPoints)",
                 "clone.Parent = module.Parent",
             ),
         ),
@@ -320,9 +324,22 @@ def validate_sources(
             (
                 f"-- version {runtime_version}",
                 'WaitForChild("ClientVfxQuality")',
+                'WaitForChild("VoxelCubicBezier")',
                 'spawnShape == "annulus"',
+                'spawnShape == "cubicBezier"',
                 'spawnDirectionMode == "radialOutward"',
                 'spawnDirectionMode == "radialTangent"',
+                'spawnDirectionMode == "curveNormal"',
+                "function Emitter:SetCubicBezier",
+            ),
+        ),
+        "VoxelCubicBezier": (
+            cubic_bezier,
+            (
+                "function VoxelCubicBezier.Build",
+                "function VoxelCubicBezier.Rebuild",
+                "function VoxelCubicBezier.Sample",
+                "cumulativeLengths",
             ),
         ),
         "ClientVfxQuality": (
@@ -335,6 +352,7 @@ def validate_sources(
                 f"local RUNTIME_VERSION = {runtime_version}",
                 f"local INSTALLER_VERSION = {installer_version}",
                 'ClientVfxQuality = Internal:WaitForChild("ClientVfxQuality")',
+                'VoxelCubicBezier = Internal:WaitForChild("VoxelCubicBezier")',
             ),
         ),
     }

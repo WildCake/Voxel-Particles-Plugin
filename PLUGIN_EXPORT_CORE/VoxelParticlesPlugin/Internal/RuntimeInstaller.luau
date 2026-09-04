@@ -16,12 +16,13 @@ local BundledSharedRuntime = {
 	ClientVfxQuality = Internal:WaitForChild("ClientVfxQuality"),
 	VoxelFairShareAllocator = Internal:WaitForChild("VoxelFairShareAllocator"),
 	VoxelMotionIntegrator = Internal:WaitForChild("VoxelMotionIntegrator"),
+	VoxelCubicBezier = Internal:WaitForChild("VoxelCubicBezier"),
 	VoxelCylinderStream = Internal:WaitForChild("VoxelCylinderStream"),
 }
 local BundledPresets = Internal:WaitForChild("BundledPresets")
 
-local RUNTIME_VERSION = 12
-local INSTALLER_VERSION = 4
+local RUNTIME_VERSION = 13
+local INSTALLER_VERSION = 5
 local MANAGED_ATTRIBUTE = "VoxelParticlesPluginManaged"
 local VERSION_ATTRIBUTE = "VoxelParticlesRuntimeVersion"
 local INSTALLER_ATTRIBUTE = "VoxelParticlesInstallerVersion"
