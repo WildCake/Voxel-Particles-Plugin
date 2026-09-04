@@ -48,7 +48,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 15
+local PLUGIN_VERSION = 14
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -737,7 +737,7 @@ runtimeRoleLabel.TextColor3 = Color3.fromRGB(145, 150, 165)
 runtimeRoleLabel.TextWrapped = true
 runtimeRoleLabel.TextXAlignment = Enum.TextXAlignment.Left
 runtimeRoleLabel.TextYAlignment = Enum.TextYAlignment.Top
-runtimeRoleLabel.Text = "Studio plugin updates: Plugins > Manage Plugins. This control changes only the open project's runtime.\nSource template (inert ModuleScript): Plugin/Internal/VoxelEmitterBinderTemplate\nInstalled runtime (enabled LocalScript): StarterPlayerScripts/VoxelEmitterBinder"
+runtimeRoleLabel.Text = "Source template (inert ModuleScript): Plugin/Internal/VoxelEmitterBinderTemplate\nInstalled runtime (enabled LocalScript): StarterPlayerScripts/VoxelEmitterBinder"
 runtimeRoleLabel.LayoutOrder = 80
 runtimeRoleLabel.Parent = header
 
@@ -748,7 +748,7 @@ initializeProjectBtn.BackgroundColor3 = Color3.fromRGB(90, 140, 255)
 initializeProjectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 initializeProjectBtn.Font = Enum.Font.GothamBold
 initializeProjectBtn.TextSize = 14
-initializeProjectBtn.Text = "Inspecting project runtime..."
+initializeProjectBtn.Text = "Inspecting runtime..."
 initializeProjectBtn.AutoButtonColor = false
 initializeProjectBtn.LayoutOrder = 90
 initializeProjectBtn.Parent = header
@@ -784,22 +784,14 @@ local function applyRuntimeInspection(status)
 	currentRuntimeStatus = status
 	runtimePrepared = status.ready == true
 	presetsFolder = status.presetsFolder
-	local roleText = "Studio plugin updates: Plugins > Manage Plugins. This control changes only the open project's runtime.\nSource template (inert ModuleScript): Plugin/Internal/VoxelEmitterBinderTemplate\nInstalled runtime (enabled LocalScript): StarterPlayerScripts/VoxelEmitterBinder"
+	local roleText = "Source template (inert ModuleScript): Plugin/Internal/VoxelEmitterBinderTemplate\nInstalled runtime (enabled LocalScript): StarterPlayerScripts/VoxelEmitterBinder"
 	if #status.duplicatePaths > 0 then
 		roleText ..= "\nDuplicates: " .. table.concat(status.duplicatePaths, ", ")
 	elseif status.blocked and #status.conflicts > 0 then
 		roleText ..= "\nConflict: " .. status.conflicts[1]
 	end
 	runtimeRoleLabel.Text = roleText
-	if status.blocked then
-		initializeProjectBtn.Text = "Rescan project runtime conflicts"
-	elseif runtimePrepared then
-		initializeProjectBtn.Text = "Project runtime ready"
-	elseif status.sharedFolder then
-		initializeProjectBtn.Text = "Update project runtime"
-	else
-		initializeProjectBtn.Text = "Install project runtime"
-	end
+	initializeProjectBtn.Text = status.action
 	initializeProjectBtn.Active = not runtimePrepared
 	initializeProjectBtn.Selectable = not runtimePrepared
 	initializeProjectBtn.AutoButtonColor = not runtimePrepared
@@ -836,7 +828,7 @@ end
 
 initializeProjectBtn.MouseButton1Click:Connect(function()
 	if isPlayMode() then
-		statusLabel.Text = "Stop Play mode before installing or updating the project runtime."
+		statusLabel.Text = "Stop Play mode before initializing the project runtime."
 		return
 	end
 	if runtimePrepared then
@@ -849,7 +841,7 @@ initializeProjectBtn.MouseButton1Click:Connect(function()
 			return
 		end
 	end
-	initializeProjectBtn.Text = "Applying project runtime..."
+	initializeProjectBtn.Text = "Initializing..."
 	initializeProjectBtn.Active = false
 	local ok, statusOrError = pcall(RuntimeInstaller.initializeRuntime)
 	if not ok then
@@ -864,7 +856,7 @@ end)
 
 createEmitterBtn.MouseButton1Click:Connect(function()
 	if not runtimePrepared then
-		statusLabel.Text = "Install or update the project runtime first."
+		statusLabel.Text = "Initialize or update the project runtime first."
 		return
 	end
 	createEmitterAtCenter()
@@ -2969,7 +2961,7 @@ local function ensureDefaultPreset()
 	end
 	local mod = presetsFolder:FindFirstChild(DEFAULT_PRESET_NAME)
 	if not mod then
-		error("Bundled Default preset is missing; use Update project runtime")
+		error("Bundled Default preset is missing; use Update project")
 	end
 	if not mod:IsA("ModuleScript") then
 		error(("Default preset must be a ModuleScript, got %s"):format(mod.ClassName))
@@ -3178,7 +3170,7 @@ saveCurrentPreset = function()
 		return
 	end
 	if not runtimePrepared or not presetsFolder then
-		statusLabel.Text = "Install or update the project runtime first."
+		statusLabel.Text = "Initialize or update the project runtime first."
 		return
 	end
 
@@ -3285,7 +3277,7 @@ createEmitterAtCenter = function()
 		return
 	end
 	if not runtimePrepared then
-		statusLabel.Text = "Install or update the project runtime first."
+		statusLabel.Text = "Initialize or update the project runtime first."
 		return
 	end
 
@@ -3508,7 +3500,7 @@ local newPresetBtn = createButton(actionsRow, "New preset", function()
 		return
 	end
 	if not runtimePrepared or not presetsFolder then
-		statusLabel.Text = "Install or update the project runtime first."
+		statusLabel.Text = "Initialize or update the project runtime first."
 		return
 	end
 	if RuntimeInstaller.isFileSynced(presetsFolder) then
