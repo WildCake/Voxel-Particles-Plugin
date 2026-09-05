@@ -50,7 +50,8 @@ return {
                                 min = 8,
                         },
                         color = {
-                                max = Color3.fromRGB(255, 215, 105),
+                                -- A fixed full blue channel keeps every RGB sample at V = 1.
+                                max = Color3.fromRGB(255, 215, 255),
                                 min = Color3.fromRGB(65, 115, 255),
                         },
                         life = {

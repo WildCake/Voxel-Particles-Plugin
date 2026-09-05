@@ -1,5 +1,23 @@
 # Changelog
 
+## v18 — 2026-09-05
+
+### Changed
+
+- Camera distance and viewport selection now refresh at 15 Hz over the cached emitter registry. Renderer startup and quality changes still refresh immediately. No raycasts or repeated scene discovery are introduced.
+- Spawn counters still reset each rendered frame. Pending burst demand prevents idle shutdown while waiting for the next admission poll; slow frames skip missed polls instead of running catch-up scans.
+- Restored the original `Fire_1` and `SimpleFire` settings, changing only upward acceleration (39.5 to 10) and the initial size-curve multiplier (0.8 to 1.6).
+- Restored the original pink Portal state. The golden `tp2` gateway and other presets are unchanged.
+- Confetti retains SmoothPlastic and uses a full blue channel throughout its random color range, keeping HSV value at 1 without Neon or lights. Its palette is blue/lavender/pink.
+
+Plugin, runtime, and installer version: **18**. All 32 presets and the existing shared budgets remain bundled.
+
+Release artifact: `dist/VoxelParticlesPlugin-v18.rbxmx`
+
+SHA-256: `e846ff17da2ca9bde78765c020e711bd78b8b0058c940091f01fc2853042baf2`
+
+Validation: release build, static Luau analysis, and focused source review; no Play tests or performance measurements were run.
+
 ## v17 — 2026-09-05
 
 ### Fixed

@@ -2,22 +2,22 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v17
+## Download v18
 
-[Download `VoxelParticlesPlugin-v17.rbxmx`](dist/VoxelParticlesPlugin-v17.rbxmx)
+[Download `VoxelParticlesPlugin-v18.rbxmx`](dist/VoxelParticlesPlugin-v18.rbxmx)
 
-SHA-256: `70545534768b7b041ae3cdd954d715fe284f8d496dbb83e9034698723ff5a724`
+SHA-256: `e846ff17da2ca9bde78765c020e711bd78b8b0058c940091f01fc2853042baf2`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v17**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v18**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **17**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **18**. The builder rejects mixed release numbers.
 
 ## Updating an existing project
 
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v17 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v18 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.
@@ -27,15 +27,16 @@ Updating the installed plugin does not replace runtime scripts already saved in 
 
 Use **Script Sync → Reveal in Explorer/Finder** to locate a mapped owner. If Studio presents a conflict after you have updated those files, select the reviewed disk version. See Roblox's [Script Sync guide](https://create.roblox.com/docs/scripting/sync).
 
-**Refreshing built-in effects:** the updater adds missing presets and preserves existing preset contents, including your edits. To adopt the v17 designs, replace `Fire_1`, `SimpleFire`, `Portal`, and `tp2` with the matching files in [BundledPresets](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets). The bundle also corrects the old `Firethrower` and `Landing_1`–`Landing_4` mappings and aligns `Teleport` with the stand. Copy all bundled preset contents to reproduce the complete showcase. Keep any customized versions under separate preset names first. For Script Sync, edit the mapped disk files. Restart Play afterward because already-required presets remain cached for that session.
+**Refreshing built-in effects:** the updater adds missing presets and preserves existing preset contents, including your edits. To adopt the v18 adjustments, replace `Fire_1`, `SimpleFire`, `Portal`, and `Confetti` with the matching files in [BundledPresets](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets). The bundle also includes v17's golden `tp2` gateway and corrected `Firethrower` and `Landing_1`–`Landing_4` mappings. Copy all bundled preset contents to reproduce the complete showcase. Keep any customized versions under separate preset names first. For Script Sync, edit the mapped disk files. Restart Play afterward because already-required presets remain cached for that session.
 
-## What's new in v17
+## What's new in v18
 
-- Camera distance and viewport admission run every rendered frame over the persistent emitter registry. CollectionService tag events maintain the binder registry; the renderer does not repeatedly scan the scene.
-- Removed the line-of-sight raycast that could reject a visible emitter behind a sign or other nearby geometry. A rejected burst previously had to wait for its next authored trigger. Distance, viewport, quality, and shared capacity limits still apply to every effect.
-- `Fire_1` is a broad amber campfire; `SimpleFire` is a smaller blue flame. Both emit from one point with shorter travel, gentle acceleration, and fading tips.
-- `Portal` is a cyan circular gate; `tp2` is a golden square gateway with outward sparks. Their shape, motion, and color differ.
-- All 32 demo presets ship as independent modules, including Bézier curves, cylinder streams, wind, confetti, gravity, smoke, all ten landing effects, and both layers of the Relic explosion. They require no demo helper or game scripts.
+- Camera distance and viewport selection refresh at 15 Hz over the persistent emitter registry, with an immediate refresh when the renderer starts or quality changes. CollectionService tag events maintain the registry; no geometry raycasts are used. Between polls, the renderer uses the cached selection.
+- Particle simulation and spawn counters remain tied to rendered frames. Queued bursts keep an otherwise idle renderer awake until the next admission poll. Shared emitter, particle, spawn, and prewarm limits are unchanged.
+- `Fire_1` and `SimpleFire` restore their original upward flame settings. Only upward acceleration changes from 39.5 to 10, and the initial size-curve multiplier increases from 0.8 to 1.6.
+- `Portal` restores the original pink effect. The golden square `tp2` gateway is unchanged.
+- Confetti keeps SmoothPlastic and now fixes the blue color channel at 255, giving every randomized color maximum HSV value without adding Neon or lights. The brighter palette spans blue, lavender, and pink.
+- All 32 demo presets remain bundled as independent modules, including both layers of the Relic explosion, with no demo helper or game-script dependencies.
 
 The demo's combination pedestals use two ordinary presets on colocated anchors:
 
@@ -117,7 +118,7 @@ Python 3 is required. The builder preserves non-source Roblox metadata from an e
 ```powershell
 python -B tools/build_plugin.py `
   --template "$env:LOCALAPPDATA\Roblox\Plugins\VoxelParticlesPlugin.rbxmx" `
-  --output "dist\VoxelParticlesPlugin-v17.rbxmx"
+  --output "dist\VoxelParticlesPlugin-v18.rbxmx"
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release details and [AGENTS.md](AGENTS.md) for repository engineering rules.

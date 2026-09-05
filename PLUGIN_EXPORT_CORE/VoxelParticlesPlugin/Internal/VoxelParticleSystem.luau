@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 17
+-- version 18
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -155,6 +155,8 @@ local _baseMaxTotalParticles = 512
 local MAX_TOTAL_PARTICLES = _baseMaxTotalParticles
 local MAX_ACTIVE_EMITTERS_HIGH = 15
 local maxActiveEmitters = MAX_ACTIVE_EMITTERS_HIGH
+local CAMERA_ADMISSION_INTERVAL = 1 / 15
+local cameraAdmissionElapsed = CAMERA_ADMISSION_INTERVAL
 
 local _qualityMultiplier = 1
 local _qualityConnections = table.create(0)
@@ -455,6 +457,7 @@ local function _applyQualityScaling()
 		end
 	end
 	selectVisibleEmitters()
+	cameraAdmissionElapsed = 0
 end
 
 
@@ -1066,7 +1069,7 @@ local function releaseParticle(state: ParticleState)
 	releaseCube(state.part)
 end
 
--- Re-rank the persistent emitter registry every rendered frame. Distance and
+-- Re-rank the persistent emitter registry at 15 Hz. Distance and
 -- viewport projection never raycast against scenery or billboard supports.
 selectVisibleEmitters = function()
 	table.clear(selectedEmitters)
@@ -1097,7 +1100,6 @@ selectVisibleEmitters = function()
 	end
 	for _, emitter in selectedEmitters do
 		emitter._admitted = true
-		emitter._spawnedThisFrame = 0
 	end
 	for _, emitter in emitters do
 		if not emitter._admitted then
@@ -1203,6 +1205,8 @@ local function ensureUpdateLoop()
 	if updateConnection then
 		return
 	end
+	-- An idle renderer starts with fresh admission instead of waiting one interval.
+	cameraAdmissionElapsed = CAMERA_ADMISSION_INTERVAL
 	updateConnection = RunService.RenderStepped:Connect(function(dt)
 		debug.profilebegin("VPS.Frame")
 		_frameSerial += 1
@@ -1214,7 +1218,16 @@ local function ensureUpdateLoop()
 		debug.profileend()
 		local poolReady = #pool + liveCount >= _baseMaxTotalParticles
 		debug.profilebegin("VPS.Admission")
-		selectVisibleEmitters()
+		cameraAdmissionElapsed += dt
+		if cameraAdmissionElapsed >= CAMERA_ADMISSION_INTERVAL then
+			-- Skip missed polls after a slow frame; never run catch-up scans.
+			cameraAdmissionElapsed %= CAMERA_ADMISSION_INTERVAL
+			selectVisibleEmitters()
+		end
+		-- Spawn limits belong to a render frame, not to the 15 Hz admission tick.
+		for _, emitter in selectedEmitters do
+			emitter._spawnedThisFrame = 0
+		end
 		debug.profileend()
 
 		-- Continuous and burst requests share one quality-scaled frame budget.
@@ -1402,14 +1415,15 @@ local function ensureUpdateLoop()
 
 		-- 7) Авто‑стоп цикла после завершения ограниченного прогрева пула.
 		if #particles == 0 then
-			local anyEnabled = false
+			local anyWork = false
 			for emitterIndex = 1, #emitters do
-				if emitters[emitterIndex]._enabled then
-					anyEnabled = true
+				local emitter = emitters[emitterIndex]
+				if emitter._enabled or emitter._spawnDemand > 0 then
+					anyWork = true
 					break
 				end
 			end
-			if not anyEnabled and poolReady then
+			if not anyWork and poolReady then
 				local connection = updateConnection
 				if connection then
 					connection:Disconnect()
@@ -2584,7 +2598,7 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 17,
+		Version = 18,
 		Frame = _frameSerial,
 		Ready = #pool + liveCount >= _baseMaxTotalParticles,
 		BaseCapacity = _baseMaxTotalParticles,
