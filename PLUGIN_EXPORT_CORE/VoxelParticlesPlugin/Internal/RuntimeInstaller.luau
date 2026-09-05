@@ -21,8 +21,8 @@ local BundledSharedRuntime = {
 }
 local BundledPresets = Internal:WaitForChild("BundledPresets")
 
-local RUNTIME_VERSION = 16
-local INSTALLER_VERSION = 16
+local RUNTIME_VERSION = 17
+local INSTALLER_VERSION = 17
 local MANAGED_ATTRIBUTE = "VoxelParticlesPluginManaged"
 local VERSION_ATTRIBUTE = "VoxelParticlesRuntimeVersion"
 local INSTALLER_ATTRIBUTE = "VoxelParticlesInstallerVersion"

@@ -29,7 +29,6 @@ local TAG                       = "VoxelEmitter"
 local PRESET_ATTRIBUTE          = "VoxelPreset"
 local BURST_ATTRIBUTE           = "VoxelBurst"
 local BURST_ON_ENABLE_ATTRIBUTE = "VoxelBurstOnEnable"
-local IGNORE_CULLING_ATTRIBUTE  = "VoxelIgnoreCulling"
 local BINDER_OWNER_NAME         = "__VoxelParticlesBinderOwner"
 
 local function describeBinder(instance: Instance): string
@@ -157,10 +156,6 @@ local function bind(part: BasePart)
 	local cfg = loadPresetState(presetName)
 	if not cfg then
 		return
-	end
-
-	if part:GetAttribute(IGNORE_CULLING_ATTRIBUTE) == true then
-		cfg.ignoreVisibilityCulling = true
 	end
 
 	local burstOnEnable = (part:GetAttribute(BURST_ON_ENABLE_ATTRIBUTE) == true)

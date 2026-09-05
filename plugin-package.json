@@ -1,8 +1,8 @@
 {
   "pluginName": "VoxelParticlesPlugin",
-  "pluginVersion": 16,
-  "runtimeVersion": 16,
-  "installerVersion": 16,
+  "pluginVersion": 17,
+  "runtimeVersion": 17,
+  "installerVersion": 17,
   "sourceRoot": "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin",
   "entrySource": "init.legacy.luau",
   "internalModules": [
@@ -16,14 +16,37 @@
     "RuntimeInstaller"
   ],
   "bundledPresets": [
+    "AnnulusOrbit",
+    "BezierAurora",
+    "BezierSparks",
+    "Confetti",
+    "CrystalBloom",
+    "CylinderFlow",
     "Default",
+    "EmberSmoke",
+    "Fire_1",
     "Firethrower",
+    "GravityWell",
+    "Grounding_1",
     "Landing_1",
     "Landing_2",
     "Landing_3",
     "Landing_4",
+    "Landing_5",
+    "Landing_6",
+    "Landing_7",
+    "Landing_8",
+    "Landing_9",
+    "Landing_10",
+    "LocalSpaceRibbon",
     "Portal",
+    "RelicExplosionCore",
+    "RelicExplosionShell",
+    "seno_burst",
+    "Shockwave",
     "SimpleFire",
-    "Teleport"
+    "Teleport",
+    "tp2",
+    "WindRibbon"
   ]
 }

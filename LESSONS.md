@@ -11,5 +11,5 @@
 - `radialOutward` and `radialTangent` derive velocity from a non-zero sampled spawn offset. Point emission naturally retains the configured emission axis.
 - RuntimeInstaller must preserve native Script Sync ownership and block conflicting or synced writes instead of adding fallback copies or compatibility lookup paths.
 - Native Script Sync ownership does not prove freshness: compare every installed runtime source with the release bundle before reporting ready.
-- VoxelParticleSystem owns one camera admission budget and shared particle pool. Bursts cannot bypass quality, visibility, emitter admission, or prewarming; a new local-space population starts at the anchor's current transform.
+- VoxelParticleSystem ranks its persistent emitter registry every rendered frame using camera distance and viewport projection, never geometry raycasts. Bursts share quality, admission, particle, and prewarm budgets; a new local-space population starts at the anchor's current transform.
 - Grow a Planet may provide proven generic changes, but its game-specific renderers, presets, catalogs, and state are not plugin dependencies.

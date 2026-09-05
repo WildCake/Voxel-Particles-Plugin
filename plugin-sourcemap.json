@@ -155,6 +155,190 @@
                     "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Teleport.luau"
                   ],
                   "children": []
+                },
+                {
+                  "name": "AnnulusOrbit",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/AnnulusOrbit.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "BezierAurora",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/BezierAurora.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "BezierSparks",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/BezierSparks.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Confetti",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Confetti.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "CrystalBloom",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/CrystalBloom.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "CylinderFlow",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/CylinderFlow.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "EmberSmoke",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/EmberSmoke.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Fire_1",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Fire_1.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "GravityWell",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/GravityWell.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Grounding_1",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Grounding_1.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_5",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_5.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_6",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_6.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_7",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_7.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_8",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_8.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_9",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_9.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Landing_10",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Landing_10.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "LocalSpaceRibbon",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/LocalSpaceRibbon.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "RelicExplosionCore",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/RelicExplosionCore.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "RelicExplosionShell",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/RelicExplosionShell.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "seno_burst",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/seno_burst.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "Shockwave",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/Shockwave.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "tp2",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/tp2.luau"
+                  ],
+                  "children": []
+                },
+                {
+                  "name": "WindRibbon",
+                  "className": "ModuleScript",
+                  "filePaths": [
+                    "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets/WindRibbon.luau"
+                  ],
+                  "children": []
                 }
               ]
             }

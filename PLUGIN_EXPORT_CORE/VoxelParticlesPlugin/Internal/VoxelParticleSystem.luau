@@ -1,67 +1,16 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 16
+-- version 17
 
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CollectionService = game:GetService("CollectionService")
 
 local VoxelCubicBezier = require(script.Parent:WaitForChild("VoxelCubicBezier"))
 local VoxelCylinderStream = require(script.Parent:WaitForChild("VoxelCylinderStream"))
 local VoxelFairShareAllocator = require(script.Parent:WaitForChild("VoxelFairShareAllocator"))
 local VoxelMotionIntegrator = require(script.Parent:WaitForChild("VoxelMotionIntegrator"))
 local ClientVfxQuality = if RunService:IsClient() then require(script.Parent:WaitForChild("ClientVfxQuality")) else nil
-
-local VISIBILITY_POLL_INTERVAL = 0.14
-local LOS_IGNORE_ATTRIBUTE = "VoxelIgnoreModel"
-local LOS_IGNORE_TAG = "IgnoreLOS"
-
-local _LOS_FILTER = table.create(16)
-
-local function _buildLosFilter(anchor: BasePart): {Instance}
-	local count = 1
-	_LOS_FILTER[count] = anchor
-
-	local parent = anchor.Parent
-	if parent and parent.Parent then
-		count += 1
-		_LOS_FILTER[count] = parent
-	end
-
-	local ignoreValue = anchor:FindFirstChild(LOS_IGNORE_ATTRIBUTE)
-	if ignoreValue and ignoreValue:IsA("ObjectValue") then
-		local ignore = ignoreValue.Value
-		if ignore and ignore.Parent then
-			count += 1
-			_LOS_FILTER[count] = ignore
-		end
-	end
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		local character = plr.Character
-		if character and character.Parent then
-			count += 1
-			_LOS_FILTER[count] = character
-		end
-	end
-
-	local tagged = CollectionService:GetTagged(LOS_IGNORE_TAG)
-	for i = 1, #tagged do
-		local instance = tagged[i]
-		if instance and instance.Parent then
-			count += 1
-			_LOS_FILTER[count] = instance
-		end
-	end
-
-	for i = count + 1, #_LOS_FILTER do
-		_LOS_FILTER[i] = nil
-	end
-
-	return _LOS_FILTER
-end
 
 -- === Performance & Noise config =========================================
 -- Пер-эмиттерный режим FPS (30 или 60). Глобальной частоты больше нет.
@@ -236,7 +185,7 @@ end
 local particles = {} :: {any}
 local emitters = {} :: {EmitterInstance}
 local selectedEmitters = table.create(MAX_ACTIVE_EMITTERS_HIGH) :: {EmitterInstance}
-local selectVisibleEmitters: (number) -> ()
+local selectVisibleEmitters: () -> ()
 -- Глобальные «часы» для rate-noise (одни на все эмиттеры)
 local _rateNoiseClock = 0
 
@@ -438,9 +387,6 @@ local DEFAULT_CONFIG = {
 	lodNear = 0,
 	lodFar  = 0,
 
-	-- Игнорировать отсечение по видимости (камера/LOS/FOV)
-	ignoreVisibilityCulling = false,
-
 	-- Турбулентность: анти-джиттер
 	turbulenceAntiJitter = false,
 
@@ -487,34 +433,6 @@ local function _readGraphicsQualityRatio(): number
 end
 
 
-local function _hasLineOfSightToCamera(anchor: BasePart?, originPosition: Vector3?): boolean
-	if not anchor then
-		return true
-	end
-	local cam = Workspace.CurrentCamera
-	if not cam then
-		return true
-	end
-
-	local camPos = cam.CFrame.Position
-	local target = originPosition or anchor.Position
-	local direction = camPos - target
-	local distance = direction.Magnitude
-	if distance <= 0 then
-		return true
-	end
-
-	local dirUnit = direction / distance
-
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = _buildLosFilter(anchor)
-	params.IgnoreWater = true
-
-	local result = Workspace:Raycast(target, dirUnit * distance, params)
-	return result == nil
-end
-
 local function _computeParticleMultiplier(qualityRatio: number): number
 	return math.clamp(qualityRatio, 0, 1)
 end
@@ -536,7 +454,7 @@ local function _applyQualityScaling()
 			end
 		end
 	end
-	selectVisibleEmitters(0)
+	selectVisibleEmitters()
 end
 
 
@@ -1148,11 +1066,12 @@ local function releaseParticle(state: ParticleState)
 	releaseCube(state.part)
 end
 
-selectVisibleEmitters = function(dt: number)
+-- Re-rank the persistent emitter registry every rendered frame. Distance and
+-- viewport projection never raycast against scenery or billboard supports.
+selectVisibleEmitters = function()
 	table.clear(selectedEmitters)
 	for _, emitter in emitters do
 		emitter._admitted = false
-		emitter._visibilityElapsed = (emitter._visibilityElapsed or 0) + dt
 		if maxActiveEmitters == 0 or emitter._destroyed
 			or not (emitter._enabled or emitter._alive > 0 or emitter._spawnDemand > 0) then
 			continue
@@ -1166,7 +1085,6 @@ selectVisibleEmitters = function(dt: number)
 			and distanceSquared >= selectedEmitters[count]._cameraDistanceSquared then
 			continue
 		end
-		if not emitter:_updateLineOfSight(false) then continue end
 		local insertion = count + 1
 		while insertion > 1
 			and distanceSquared < selectedEmitters[insertion - 1]._cameraDistanceSquared do
@@ -1296,7 +1214,7 @@ local function ensureUpdateLoop()
 		debug.profileend()
 		local poolReady = #pool + liveCount >= _baseMaxTotalParticles
 		debug.profilebegin("VPS.Admission")
-		selectVisibleEmitters(dt)
+		selectVisibleEmitters()
 		debug.profileend()
 
 		-- Continuous and burst requests share one quality-scaled frame budget.
@@ -1512,45 +1430,6 @@ local function stopUpdateLoopIfIdle()
 		updateConnection = nil
 	end
 end
-
-function Emitter:_updateLineOfSight(forceImmediate: boolean?): boolean
-	local anchor = self.anchor
-
-	if self.ignoreVisibilityCulling then
-		self._hasLineOfSight = true
-		self._visibilityElapsed = 0
-		return true
-	end
-
-	-- Для непрерывных эффектов (rate > 0) без якоря считаем невидимым.
-	if not anchor or not anchor.Parent then
-		self._hasLineOfSight = false
-		self._visibilityElapsed = 0
-		return false
-	end
-
-	-- Троттлинг LOS-проверок для непрерывных эффектов.
-	self._visibilityElapsed = self._visibilityElapsed or 0
-	if forceImmediate then
-		self._visibilityElapsed = VISIBILITY_POLL_INTERVAL
-	end
-
-	if self._visibilityElapsed >= VISIBILITY_POLL_INTERVAL then
-		self._visibilityElapsed = 0
-
-		local okPosition, originPosition = pcall(function()
-			return anchor.Position
-		end)
-		if okPosition then
-			self._hasLineOfSight = _hasLineOfSightToCamera(anchor, originPosition)
-		else
-			self._hasLineOfSight = false
-		end
-	end
-
-	return self._hasLineOfSight ~= false
-end
-
 
 -- Camera visibility is shared by continuous emission, explicit bursts and admission.
 function Emitter:_getCameraScale(): (number, number)
@@ -1807,7 +1686,6 @@ function Emitter:_applyConfig(config)
 			and (not self.curves.rotationZ or (self.curves.rotationZ[1]==1 and self.curves.rotationZ[2]==1 and self.curves.rotationZ[3]==1)))
 
 	self.turbulenceAntiJitter = (merged.turbulenceAntiJitter == true)
-	self.ignoreVisibilityCulling = (merged.ignoreVisibilityCulling == true)
 	self.localSpace = (merged.localSpace == true)
 	self.faceMovement = (merged.faceMovement == true)
 
@@ -2525,7 +2403,7 @@ function Emitter:Emit(count: number): number
 	end
 
 	local cameraScale = self:_getCameraScale()
-	if cameraScale <= 0 or not self:_updateLineOfSight(true) then
+	if cameraScale <= 0 then
 		return 0
 	end
 	count = math.floor(count * cameraScale * _qualityMultiplier)
@@ -2679,8 +2557,6 @@ function VoxelParticleSystem.newEmitter(anchor: BasePart, config: any?): Emitter
 	emitter._serial = 0
 	emitter._seed32 = _u32(math.floor((os.clock()*1000000) % 0xFFFFFFFF))
 	emitter._lastAnchorCF = anchor and anchor.CFrame or CFrame.new()
-	emitter._visibilityElapsed = VISIBILITY_POLL_INTERVAL
-	emitter._hasLineOfSight = true
 	-- Пер-эмиттерный FPS (дефолт берём из DEFAULT_EMITTER_FPS, далее может переопределиться конфигом)
 	emitter._simAccumulator = 0
 	emitter.targetFps = DEFAULT_EMITTER_FPS
@@ -2708,7 +2584,7 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 16,
+		Version = 17,
 		Frame = _frameSerial,
 		Ready = #pool + liveCount >= _baseMaxTotalParticles,
 		BaseCapacity = _baseMaxTotalParticles,

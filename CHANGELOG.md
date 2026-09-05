@@ -1,5 +1,28 @@
 # Changelog
 
+## v17 — 2026-09-05
+
+### Fixed
+
+- Removed geometry raycasts from camera admission and explicit bursts. A sign or nearby object can no longer cancel a burst whose anchor passes viewport and distance checks. Nearest-emitter selection already runs each rendered frame over the persistent registry; no multi-second selection timer is involved.
+- Retuned the two duplicated fire presets for bounded acceleration and compact point emission. `Fire_1` is a broad amber campfire; `SimpleFire` is a smaller blue flame.
+- Separated `Portal` and `tp2` into a cyan circular gate and golden square gateway. Corrected the bundled Portal's internal preset name, which was incorrectly `tp2`.
+- Aligned existing `Firethrower`, `Landing_1`–`Landing_4`, and `Teleport` contents with the showcase. Several old bundled names pointed to different authored effects.
+
+### Added
+
+- All 32 showcase presets are bundled, up from nine. The 23 additions are complete preset tables with no dependency on demo helpers or game scripts.
+- README recipes for the three combination pedestals. Orbital Rift now combines `GravityWell` and `AnnulusOrbit`, and Volcanic Furnace combines `Fire_1` and `EmberSmoke`.
+- Explicit instructions for refreshing changed built-in presets without overwriting project-authored customizations.
+
+Plugin, runtime, and installer version: **17**. Shared emitter, particle, spawn, and prewarm budgets are unchanged. Obsolete LOS bypass attributes/configuration are no longer consumed.
+
+Release artifact: `dist/VoxelParticlesPlugin-v17.rbxmx`
+
+SHA-256: `70545534768b7b041ae3cdd954d715fe284f8d496dbb83e9034698723ff5a724`
+
+Validation: manifest build, XML membership, and static Luau source analysis. The unchanged weak-table type annotation in the native binder still produces its existing analyzer diagnostic. No Play tests, runtime measurements, or visual acceptance were performed for this release, as requested.
+
 ## v16 — 2026-09-05
 
 ### Fixed

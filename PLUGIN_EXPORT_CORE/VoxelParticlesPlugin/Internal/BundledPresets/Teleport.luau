@@ -3,7 +3,7 @@ return {
         name = "Teleport",
         displayName = "Teleport",
         partName = "VoxelEmitter",
-        emitterWorldCFrame = CFrame.new(330, 17.602722, 280, 0.965926, -0.258819, 0, 0.258819, 0.965926, 0, 0, 0, 1),
+        emitterWorldCFrame = CFrame.new(331.294128, 12.773086, 280, 0.965926, -0.258819, 0, 0.258819, 0.965926, 0, 0, 0, 1),
         enabled = true,
         state = {
                 _lifeNoiseSeedValue = 0,
@@ -25,7 +25,7 @@ return {
                         mid = Color3.fromRGB(255, 255, 255),
                         start = Color3.fromRGB(255, 255, 255),
                 },
-                cullOutsideFov = false,
+                cullOutsideFov = true,
                 distanceSpeedFactor = 2.2,
                 emissionDirection = Vector3.new(0, 1, 0),
                 enabled = true,
@@ -125,7 +125,7 @@ return {
                 steerNoiseAmplitude = 0,
                 steerNoiseFrequency = 0,
                 turbulenceAntiJitter = false,
-                visualUpdateStep = 1,
+                visualUpdateStep = 4,
                 wind = Vector3.new(0, 0, 0),
         },
 }

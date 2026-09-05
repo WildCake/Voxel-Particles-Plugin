@@ -2,29 +2,50 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v16
+## Download v17
 
-[Download `VoxelParticlesPlugin-v16.rbxmx`](dist/VoxelParticlesPlugin-v16.rbxmx)
+[Download `VoxelParticlesPlugin-v17.rbxmx`](dist/VoxelParticlesPlugin-v17.rbxmx)
 
-SHA-256: `5ede188c300d917cd05084fc69bfbb7b0669288c59023acdfd72100493eb62ec`
+SHA-256: `70545534768b7b041ae3cdd954d715fe284f8d496dbb83e9034698723ff5a724`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v16**, then use **Initialize/Update project** to install the complete runtime and bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v17**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer now share release number **16**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **17**. The builder rejects mixed release numbers.
 
 ## Updating an existing project
 
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v16 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v17 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.
+   - Add missing modules from `Internal/BundledPresets` to the mapped `ReplicatedStorage.Shared.VoxelEmitterPresets` folder.
 4. Let Script Sync propagate, then rescan in the plugin. An outdated synced module now blocks readiness and names the mismatching instance. Keep project-authored presets; the updater does not replace existing preset contents.
 5. Start a fresh Play session to load the updated modules, verify the project, then publish the place.
 
 Use **Script Sync → Reveal in Explorer/Finder** to locate a mapped owner. If Studio presents a conflict after you have updated those files, select the reviewed disk version. See Roblox's [Script Sync guide](https://create.roblox.com/docs/scripting/sync).
+
+**Refreshing built-in effects:** the updater adds missing presets and preserves existing preset contents, including your edits. To adopt the v17 designs, replace `Fire_1`, `SimpleFire`, `Portal`, and `tp2` with the matching files in [BundledPresets](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets). The bundle also corrects the old `Firethrower` and `Landing_1`–`Landing_4` mappings and aligns `Teleport` with the stand. Copy all bundled preset contents to reproduce the complete showcase. Keep any customized versions under separate preset names first. For Script Sync, edit the mapped disk files. Restart Play afterward because already-required presets remain cached for that session.
+
+## What's new in v17
+
+- Camera distance and viewport admission run every rendered frame over the persistent emitter registry. CollectionService tag events maintain the binder registry; the renderer does not repeatedly scan the scene.
+- Removed the line-of-sight raycast that could reject a visible emitter behind a sign or other nearby geometry. A rejected burst previously had to wait for its next authored trigger. Distance, viewport, quality, and shared capacity limits still apply to every effect.
+- `Fire_1` is a broad amber campfire; `SimpleFire` is a smaller blue flame. Both emit from one point with shorter travel, gentle acceleration, and fading tips.
+- `Portal` is a cyan circular gate; `tp2` is a golden square gateway with outward sparks. Their shape, motion, and color differ.
+- All 32 demo presets ship as independent modules, including Bézier curves, cylinder streams, wind, confetti, gravity, smoke, all ten landing effects, and both layers of the Relic explosion. They require no demo helper or game scripts.
+
+The demo's combination pedestals use two ordinary presets on colocated anchors:
+
+| Stand | Presets | Trigger |
+| --- | --- | --- |
+| Volcanic Furnace | `Fire_1` + `EmberSmoke` | Continuous |
+| Relic Maze Explosion | `RelicExplosionCore` + `RelicExplosionShell` | Emit both bursts together |
+| Orbital Rift | `GravityWell` + `AnnulusOrbit` | Continuous spherical core and orbital halo |
+
+Place anchors at the same position and assign their `VoxelPreset` attributes to reproduce these combinations. Each layer remains subject to the shared system limits.
 
 ## What's new in v16
 
@@ -96,7 +117,7 @@ Python 3 is required. The builder preserves non-source Roblox metadata from an e
 ```powershell
 python -B tools/build_plugin.py `
   --template "$env:LOCALAPPDATA\Roblox\Plugins\VoxelParticlesPlugin.rbxmx" `
-  --output "dist\VoxelParticlesPlugin-v16.rbxmx"
+  --output "dist\VoxelParticlesPlugin-v17.rbxmx"
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release details and [AGENTS.md](AGENTS.md) for repository engineering rules.
