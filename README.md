@@ -2,22 +2,22 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v18
+## Download v19
 
-[Download `VoxelParticlesPlugin-v18.rbxmx`](dist/VoxelParticlesPlugin-v18.rbxmx)
+[Download `VoxelParticlesPlugin-v19.rbxmx`](dist/VoxelParticlesPlugin-v19.rbxmx)
 
-SHA-256: `e846ff17da2ca9bde78765c020e711bd78b8b0058c940091f01fc2853042baf2`
+SHA-256: `93e4de3632e6500a2965274c0b7e88b6537c398921979d5ea2577eec566710b0`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v18**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v19**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **18**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **19**. The builder rejects mixed release numbers.
 
 ## Updating an existing project
 
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v18 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v19 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.
@@ -27,7 +27,12 @@ Updating the installed plugin does not replace runtime scripts already saved in 
 
 Use **Script Sync → Reveal in Explorer/Finder** to locate a mapped owner. If Studio presents a conflict after you have updated those files, select the reviewed disk version. See Roblox's [Script Sync guide](https://create.roblox.com/docs/scripting/sync).
 
-**Refreshing built-in effects:** the updater adds missing presets and preserves existing preset contents, including your edits. To adopt the v18 adjustments, replace `Fire_1`, `SimpleFire`, `Portal`, and `Confetti` with the matching files in [BundledPresets](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets). The bundle also includes v17's golden `tp2` gateway and corrected `Firethrower` and `Landing_1`–`Landing_4` mappings. Copy all bundled preset contents to reproduce the complete showcase. Keep any customized versions under separate preset names first. For Script Sync, edit the mapped disk files. Restart Play afterward because already-required presets remain cached for that session.
+**Refreshing built-in effects:** the updater adds missing presets and preserves existing preset contents, including your edits. To adopt the v19 fire adjustments, replace `Fire_1` and `SimpleFire` with the matching files in [BundledPresets](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets). The bundle also includes v17's golden `tp2` gateway and corrected `Firethrower` and `Landing_1`–`Landing_4` mappings. Copy all bundled preset contents to reproduce the complete showcase. Keep any customized versions under separate preset names first. For Script Sync, edit the mapped disk files. Restart Play afterward because already-required presets remain cached for that session.
+
+## What's new in v19
+
+- Both fire presets reduce size-noise amplitude from 0.74 to 0.185 and frequency from 5.6 to 1.4: four times gentler and slower per-particle size variation.
+- `SimpleFire` uses a green-to-turquoise-to-blue color curve. Its movement, acceleration, lifetime, initial size, and other settings are unchanged from v18; `Fire_1` retains its warm colors.
 
 ## What's new in v18
 
@@ -118,7 +123,7 @@ Python 3 is required. The builder preserves non-source Roblox metadata from an e
 ```powershell
 python -B tools/build_plugin.py `
   --template "$env:LOCALAPPDATA\Roblox\Plugins\VoxelParticlesPlugin.rbxmx" `
-  --output "dist\VoxelParticlesPlugin-v18.rbxmx"
+  --output "dist\VoxelParticlesPlugin-v19.rbxmx"
 ```
 
 See [CHANGELOG.md](CHANGELOG.md) for release details and [AGENTS.md](AGENTS.md) for repository engineering rules.

@@ -1,8 +1,8 @@
 {
   "pluginName": "VoxelParticlesPlugin",
-  "pluginVersion": 18,
-  "runtimeVersion": 18,
-  "installerVersion": 18,
+  "pluginVersion": 19,
+  "runtimeVersion": 19,
+  "installerVersion": 19,
   "sourceRoot": "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin",
   "entrySource": "init.legacy.luau",
   "internalModules": [

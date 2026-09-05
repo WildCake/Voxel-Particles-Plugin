@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 18
+-- version 19
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -2598,7 +2598,7 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 18,
+		Version = 19,
 		Frame = _frameSerial,
 		Ready = #pool + liveCount >= _baseMaxTotalParticles,
 		BaseCapacity = _baseMaxTotalParticles,

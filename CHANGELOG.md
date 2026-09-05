@@ -1,5 +1,17 @@
 # Changelog
 
+## v19 — 2026-09-05
+
+- Reduced `sizeNoiseAmplitude` from 0.74 to 0.185 and `sizeNoiseFrequency` from 5.6 to 1.4 in both `Fire_1` and `SimpleFire`.
+- Changed only `SimpleFire`'s color curve to green, turquoise, and blue. Flame motion, acceleration, lifetime, initial size, opacity, and emission remain as in v18.
+- The complete package still contains 32 presets and eight internal modules. Plugin, runtime, and installer share version **19**; the 15 Hz camera admission and shared budgets are unchanged.
+
+Release artifact: `dist/VoxelParticlesPlugin-v19.rbxmx`
+
+SHA-256: `93e4de3632e6500a2965274c0b7e88b6537c398921979d5ea2577eec566710b0`
+
+Validation: release build, focused static Luau analysis, and source/package inspection. No Play tests or visual acceptance were run.
+
 ## v18 — 2026-09-05
 
 ### Changed
