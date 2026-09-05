@@ -48,7 +48,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 15
+local PLUGIN_VERSION = 16
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -285,7 +285,6 @@ local function defaultState()
 		visualUpdateStep = 1,
 		sizeUpdateStep = 1,
 
-		cullOutsideFov = false,
 		lodNear = 0,
 		lodFar = 0,
 
@@ -409,7 +408,6 @@ local function buildConfig(state)
 		sizeUpdateStep = state.sizeUpdateStep,
 
 
-		cullOutsideFov = state.cullOutsideFov,
 		lodNear = state.lodNear,
 		lodFar = state.lodFar,
 
@@ -2610,10 +2608,6 @@ local function rebuildPanel(state)
 		state.sizeUpdateStep = math.clamp(math.floor(v + 0.5), 1, 8)
 		scheduleApply()
 	end, formatInteger)
-	createCheckbox(updateContent, "Cull outside FOV", state.cullOutsideFov, function(value)
-		state.cullOutsideFov = value
-		scheduleApply()
-	end)
 	local lodFarSlider
 	createSlider(updateContent, "LOD near", 0, 600, state.lodNear, 1, function(v)
 		state.lodNear = math.max(0, math.floor(v + 0.5))

@@ -63,6 +63,9 @@ def load_manifest() -> dict:
     missing = sorted(required.difference(manifest))
     if missing:
         raise RuntimeError("Manifest is missing: " + ", ".join(missing))
+    versions = [manifest[key] for key in ("pluginVersion", "runtimeVersion", "installerVersion")]
+    if any(type(version) is not int or version < 1 for version in versions) or len(set(versions)) != 1:
+        raise RuntimeError("Plugin, runtime, and installer must share one positive release version")
     for list_name in ("internalModules", "bundledPresets"):
         values = manifest[list_name]
         if not isinstance(values, list) or not values or len(values) != len(set(values)):
@@ -323,6 +326,7 @@ def validate_sources(
             vps,
             (
                 f"-- version {runtime_version}",
+                f"Version = {runtime_version},",
                 'WaitForChild("ClientVfxQuality")',
                 'WaitForChild("VoxelCubicBezier")',
                 'spawnShape == "annulus"',

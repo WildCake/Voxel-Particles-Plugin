@@ -45,7 +45,7 @@ Native Script Sync owns mapped project source. RuntimeInstaller may inspect it b
 When public behavior or package membership changes:
 
 1. Update the canonical source owner and relevant editor/installer consumers.
-2. Increment explicit plugin/runtime/installer versions only when their owned contract changed.
+2. Use one release number for plugin, runtime, and installer. Ship the complete runtime bundle with every plugin release; the builder rejects mixed versions.
 3. Update `plugin-package.json` and `plugin-sourcemap.json` together for source membership changes.
 4. Build to a separate artifact; never overwrite the installed/template plugin:
 

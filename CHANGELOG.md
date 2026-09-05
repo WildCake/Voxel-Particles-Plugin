@@ -1,5 +1,28 @@
 # Changelog
 
+## v16 — 2026-09-05
+
+### Fixed
+
+- Bursts now obey camera visibility, distance LOD, and the same quality and capacity budgets as continuous emitters.
+- A shared nearest-visible admission pass limits simulated emitters to 15/10/5/0 on High/Medium/Low/Minimum. Rejected emitters release living particles and queued demand.
+- Quality reductions reclaim excess particles and emitter slots when the budget changes.
+- Explicit bursts no longer bypass the pool creation budget. The default pool prewarms all 512 Parts at up to 8 per rendered frame before emission; quality changes retain the reserve.
+- A new local-space particle population uses the current anchor transform after prewarming or camera culling.
+- RuntimeInstaller checks the source of native-synced modules before reporting readiness and identifies stale owners without writing over them.
+
+### Changed
+
+- Plugin, runtime, and installer use one release number: 16. Builds reject mixed versions.
+- Quality scales the global particle ceiling, per-emitter capacity, rate, burst demand, and total spawns per frame. High defaults to 512 living particles and 128 spawns per frame across the entire system.
+- Camera admission is mandatory; the editor no longer exposes a per-preset FOV bypass.
+- Studio follows the shared adaptive quality policy instead of silently forcing Medium.
+- Runtime diagnostics report version, allocation, warmup, emitter admission, and frame budgets.
+
+Release artifact: `dist/VoxelParticlesPlugin-v16.rbxmx`
+
+SHA-256: `5ede188c300d917cd05084fc69bfbb7b0669288c59023acdfd72100493eb62ec`
+
 ## v15 — 2026-09-05
 
 ### Fixed

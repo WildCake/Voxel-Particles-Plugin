@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 13
+-- version 16
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -70,7 +70,7 @@ local SIM_STEP_60 = 1/60
 -- ограничители от «спирали смерти» и бёрстов
 
 local MAX_SUBSTEPS_PER_FRAME = 2   -- не более 2 сим‑шагов за один кадр
-local MAX_SPAWN_PER_FRAME    = 96  -- не более 64 новых частиц от эмиттера за кадр
+local MAX_SPAWN_PER_FRAME    = 96  -- combined burst/rate ceiling per emitter at High
 local MAX_POOLED_PART_CREATIONS_PER_FRAME = 8
 local _frameSerial = 0
 -- [ADD LINES] — маска первого появления
@@ -204,6 +204,8 @@ end
 
 local _baseMaxTotalParticles = 512
 local MAX_TOTAL_PARTICLES = _baseMaxTotalParticles
+local MAX_ACTIVE_EMITTERS_HIGH = 15
+local maxActiveEmitters = MAX_ACTIVE_EMITTERS_HIGH
 
 local _qualityMultiplier = 1
 local _qualityConnections = table.create(0)
@@ -215,6 +217,8 @@ local _qualitySignalsConnected = false
 local pool: {BasePart} = {}
 local liveCount = 0
 local partCreationsThisFrame = 0
+local spawnsThisFrame = 0
+local frameSpawnLimit = 0
 
 local function _budgetMul(): number
 	local limit = MAX_TOTAL_PARTICLES
@@ -231,6 +235,8 @@ end
 
 local particles = {} :: {any}
 local emitters = {} :: {EmitterInstance}
+local selectedEmitters = table.create(MAX_ACTIVE_EMITTERS_HIGH) :: {EmitterInstance}
+local selectVisibleEmitters: (number) -> ()
 -- Глобальные «часы» для rate-noise (одни на все эмиттеры)
 local _rateNoiseClock = 0
 
@@ -429,7 +435,6 @@ local DEFAULT_CONFIG = {
 	sizeUpdateStep   = 1, -- скейл: применять каждые N шагов (1/2/3)
 
 	-- LOD/отсечение
-	cullOutsideFov = false,
 	lodNear = 0,
 	lodFar  = 0,
 
@@ -516,9 +521,10 @@ end
 
 -- [REPLACE WHOLE FUNCTION] _applyQualityScaling
 local function _applyQualityScaling()
-	-- НИЧЕГО не делаем с MAX_TOTAL_PARTICLES и maxParticles.
-	-- Масштабируем ТОЛЬКО частоту эмиссии per‑emitter.
+	MAX_TOTAL_PARTICLES = math.max(0, math.floor(_baseMaxTotalParticles * _qualityMultiplier + 0.5))
+	maxActiveEmitters = math.floor(MAX_ACTIVE_EMITTERS_HIGH * _qualityMultiplier + 0.5)
 	for _, emitter in ipairs(emitters) do
+		emitter.maxParticles = math.max(0, math.floor(emitter._baseMaxParticles * _qualityMultiplier + 0.5))
 		if emitter._baseRate == nil then
 			emitter._baseRate = math.max(0, tonumber(emitter.rate) or 0)
 		end
@@ -530,6 +536,7 @@ local function _applyQualityScaling()
 			end
 		end
 	end
+	selectVisibleEmitters(0)
 end
 
 
@@ -557,30 +564,18 @@ local function _connectQualitySignals()
 	end
 end
 
-if RunService:IsClient() then
-	_updateQualityMultiplier()
-	_applyQualityScaling()
-	_connectQualitySignals()
-else
-	_applyQualityScaling()
-end
-
-
 -- [REPLACE WHOLE FUNCTION] acquireCube
 -- [REPLACE WHOLE FUNCTION]
-local function acquireCube(allowBurstCreation: boolean?): BasePart?
+local function acquireCube(): BasePart?
 	if liveCount >= MAX_TOTAL_PARTICLES then
 		return nil
 	end
 	local part = table.remove(pool)
 	if not part then
-		if not allowBurstCreation and partCreationsThisFrame >= MAX_POOLED_PART_CREATIONS_PER_FRAME then
-			return nil
-		end
-		partCreationsThisFrame += 1
-		part = createCube()
+		return nil
 	end
 	liveCount += 1
+	spawnsThisFrame += 1
 
 	-- Насильная маска: деталь есть в мире, но локально невидима
 	part.LocalTransparencyModifier = 1
@@ -600,7 +595,7 @@ local function releaseCube(part: BasePart)
 	part.Size = Vector3.new(0.5, 0.5, 0.5)
 	part.CFrame = CFrame.new()
 	liveCount = math.max(0, liveCount - 1)
-	local reusableCapacity = math.max(0, MAX_TOTAL_PARTICLES - liveCount)
+	local reusableCapacity = math.max(0, _baseMaxTotalParticles - liveCount)
 	if #pool >= reusableCapacity then
 		part:Destroy()
 		return
@@ -615,11 +610,11 @@ local function releaseCube(part: BasePart)
 end
 
 local function warmPoolWithinFrameBudget()
-	if not RunService:IsClient() then
-		return
+	local reusableCapacity = math.max(0, _baseMaxTotalParticles - liveCount)
+	while #pool > reusableCapacity do
+		local part = table.remove(pool)
+		if part then part:Destroy() end
 	end
-
-	local reusableCapacity = math.max(0, MAX_TOTAL_PARTICLES - liveCount)
 	local missing = reusableCapacity - #pool
 	local remainingBudget = MAX_POOLED_PART_CREATIONS_PER_FRAME - partCreationsThisFrame
 	local createCount = math.max(0, math.min(missing, remainingBudget))
@@ -1153,6 +1148,61 @@ local function releaseParticle(state: ParticleState)
 	releaseCube(state.part)
 end
 
+selectVisibleEmitters = function(dt: number)
+	table.clear(selectedEmitters)
+	for _, emitter in emitters do
+		emitter._admitted = false
+		emitter._visibilityElapsed = (emitter._visibilityElapsed or 0) + dt
+		if maxActiveEmitters == 0 or emitter._destroyed
+			or not (emitter._enabled or emitter._alive > 0 or emitter._spawnDemand > 0) then
+			continue
+		end
+		local cameraScale, distanceSquared = emitter:_getCameraScale()
+		emitter._cameraScale = cameraScale
+		emitter._cameraDistanceSquared = distanceSquared
+		if cameraScale <= 0 then continue end
+		local count = #selectedEmitters
+		if count == maxActiveEmitters
+			and distanceSquared >= selectedEmitters[count]._cameraDistanceSquared then
+			continue
+		end
+		if not emitter:_updateLineOfSight(false) then continue end
+		local insertion = count + 1
+		while insertion > 1
+			and distanceSquared < selectedEmitters[insertion - 1]._cameraDistanceSquared do
+			insertion -= 1
+		end
+		table.insert(selectedEmitters, insertion, emitter)
+		if #selectedEmitters > maxActiveEmitters then
+			table.remove(selectedEmitters)
+		end
+	end
+	for _, emitter in selectedEmitters do
+		emitter._admitted = true
+		emitter._spawnedThisFrame = 0
+	end
+	for _, emitter in emitters do
+		if not emitter._admitted then
+			emitter._spawnDemand = 0
+			emitter._burstDemand = 0
+			emitter._quotaDebt = 0
+			emitter._accumulator = 0
+			emitter._simAccumulator = 0
+			emitter._pendingSubsteps = 0
+		end
+	end
+	-- Reclaim before simulation: invisible emitters and quality reductions never
+	-- retain a second, unbudgeted population of living particles.
+	for index = #particles, 1, -1 do
+		local state = particles[index]
+		local emitter = state.emitter
+		if not emitter._admitted or emitter._alive > emitter.maxParticles
+			or liveCount > MAX_TOTAL_PARTICLES then
+			releaseParticle(state)
+		end
+	end
+end
+
 local function spawnDemandPhase(quota: number, explicitBurst: boolean): number
 	if quota <= 0 then
 		return 0
@@ -1163,8 +1213,8 @@ local function spawnDemandPhase(quota: number, explicitBurst: boolean): number
 	local allocated = _FAIR_ALLOC
 	local count = 0
 
-	for index = 1, #emitters do
-		local emitter = emitters[index]
+	for index = 1, #selectedEmitters do
+		local emitter = selectedEmitters[index]
 		local totalDemand = math.max(0, emitter._spawnDemand or 0)
 		local burstDemand = math.min(totalDemand, math.max(0, emitter._burstDemand or 0))
 		local demand = explicitBurst and burstDemand or (totalDemand - burstDemand)
@@ -1173,9 +1223,8 @@ local function spawnDemandPhase(quota: number, explicitBurst: boolean): number
 		if demand > localCap then
 			demand = localCap
 		end
-		if demand > MAX_SPAWN_PER_FRAME then
-			demand = MAX_SPAWN_PER_FRAME
-		end
+		demand = math.min(demand,
+			math.max(0, math.floor(MAX_SPAWN_PER_FRAME * _qualityMultiplier) - emitter._spawnedThisFrame))
 
 		if demand > 0 then
 			count += 1
@@ -1210,13 +1259,14 @@ local function spawnDemandPhase(quota: number, explicitBurst: boolean): number
 				if liveCount >= MAX_TOTAL_PARTICLES then
 					break
 				end
-				if not emitter:_spawnOne(explicitBurst) then
+				if not emitter:_spawnOne() then
 					break
 				end
 				spawned += 1
 			end
 
 			emitter._spawnDemand = math.max(0, emitter._spawnDemand - spawned)
+			emitter._spawnedThisFrame += spawned
 			if explicitBurst then
 				emitter._burstDemand = math.max(0, emitter._burstDemand - spawned)
 			end
@@ -1236,24 +1286,32 @@ local function ensureUpdateLoop()
 		return
 	end
 	updateConnection = RunService.RenderStepped:Connect(function(dt)
+		debug.profilebegin("VPS.Frame")
 		_frameSerial += 1
 		_rateNoiseClock += dt
 		partCreationsThisFrame = 0
+		spawnsThisFrame = 0
+		debug.profilebegin("VPS.PoolWarmup")
 		warmPoolWithinFrameBudget()
+		debug.profileend()
+		local poolReady = #pool + liveCount >= _baseMaxTotalParticles
+		debug.profilebegin("VPS.Admission")
+		selectVisibleEmitters(dt)
+		debug.profileend()
 
-		-- === Fair‑share спавн (без изменений) ===============================
-		-- === DRR fair‑share спавн (пропорционально, без «выключения» эмиттеров) =====
-		local GLOBAL_MAX_SPAWN_PER_FRAME = 128 -- мягкий глобальный лимит на кадр
+		-- Continuous and burst requests share one quality-scaled frame budget.
+		local GLOBAL_MAX_SPAWN_PER_FRAME = math.floor(128 * _qualityMultiplier)
+		frameSpawnLimit = GLOBAL_MAX_SPAWN_PER_FRAME
 
 		local function spawnDRR()
+			if not poolReady then return end
 			local available = MAX_TOTAL_PARTICLES - liveCount
 			if available <= 0 then
 				-- Ничего не спавним, но НЕ обнуляем _spawnDemand: долг перенесётся на следующие кадры.
 				return
 			end
 
-			-- Explicit Emit()/burstOnEnable demand is not throttled by background Part creation.
-			-- Existing per-emitter and global spawn caps still apply; continuous rate demand uses the pool budget below.
+			-- Emission only borrows prewarmed Parts, including explicit bursts.
 			local burstSpawned = spawnDemandPhase(
 				math.min(available, GLOBAL_MAX_SPAWN_PER_FRAME),
 				true
@@ -1261,18 +1319,13 @@ local function ensureUpdateLoop()
 
 			available = MAX_TOTAL_PARTICLES - liveCount
 			local frameQuota = GLOBAL_MAX_SPAWN_PER_FRAME - burstSpawned
-			local remainingPooledCreations = math.max(
-				0,
-				MAX_POOLED_PART_CREATIONS_PER_FRAME - partCreationsThisFrame
-			)
-			local rateMaterializationCapacity = #pool + remainingPooledCreations
 			spawnDemandPhase(
-				math.min(available, frameQuota, rateMaterializationCapacity),
+				math.min(available, frameQuota, #pool),
 				false
 			)
 
-			for index = 1, #emitters do
-				local emitter = emitters[index]
+			for index = 1, #selectedEmitters do
+				local emitter = selectedEmitters[index]
 				local backlogCap = math.min(emitter.maxParticles - emitter._alive, MAX_SPAWN_PER_FRAME * 4)
 				if backlogCap < 0 then
 					backlogCap = 0
@@ -1291,9 +1344,9 @@ local function ensureUpdateLoop()
 
 		-- 1) Готовим саб‑шаги и альфу интерполяции для эмиттеров 30 FPS.
 		--    ВАЖНО: считаем «время» не только для включённых, но и для тех, у кого ещё есть живые частицы.
-		local emitterCount = #emitters
+		local emitterCount = #selectedEmitters
 		for i = 1, emitterCount do
-			local e = emitters[i]
+			local e = selectedEmitters[i]
 			if e._isFixed30 then
 				local hasActive = e._enabled or (e._alive and e._alive > 0)
 				if hasActive then
@@ -1325,8 +1378,8 @@ local function ensureUpdateLoop()
 
 		-- 2) Копим «спрос» на спавн: ТОЛЬКО для включённых эмиттеров
 		for i = 1, emitterCount do
-			local e = emitters[i]
-			if e._enabled then
+			local e = selectedEmitters[i]
+			if e._enabled and poolReady then
 				if e._isFixed30 then
 					local steps = e._pendingSubsteps
 					for _ = 1, steps do
@@ -1339,6 +1392,7 @@ local function ensureUpdateLoop()
 		end
 
 		-- 3) Шаг симуляции частиц — НЕ зависит от enabled (живые частицы продолжают жить)
+		debug.profilebegin("VPS.Simulation")
 		local i = #particles
 		while i >= 1 do
 			local state = particles[i]
@@ -1376,8 +1430,10 @@ local function ensureUpdateLoop()
 				i -= 1
 			end
 		end
-		-- Вызываем новый распределитель
+		debug.profileend()
+		debug.profilebegin("VPS.Spawn")
 		spawnDRR()
+		debug.profileend()
 		-- 4.5) Насильная маска первых двух кадров (для всех частиц, 30 и 60 FPS)
 		do
 			local pcount = #particles
@@ -1435,7 +1491,6 @@ local function ensureUpdateLoop()
 					break
 				end
 			end
-			local poolReady = not RunService:IsClient() or (#pool + liveCount >= MAX_TOTAL_PARTICLES)
 			if not anyEnabled and poolReady then
 				local connection = updateConnection
 				if connection then
@@ -1444,13 +1499,14 @@ local function ensureUpdateLoop()
 				updateConnection = nil
 			end
 		end
+		debug.profileend()
 	end)
 end
 
 
 
 local function stopUpdateLoopIfIdle()
-	local poolReady = not RunService:IsClient() or (#pool + liveCount >= MAX_TOTAL_PARTICLES)
+	local poolReady = #pool + liveCount >= _baseMaxTotalParticles
 	if updateConnection and #emitters == 0 and #particles == 0 and poolReady then
 		updateConnection:Disconnect()
 		updateConnection = nil
@@ -1495,6 +1551,27 @@ function Emitter:_updateLineOfSight(forceImmediate: boolean?): boolean
 	return self._hasLineOfSight ~= false
 end
 
+
+-- Camera visibility is shared by continuous emission, explicit bursts and admission.
+function Emitter:_getCameraScale(): (number, number)
+	local anchor = self.anchor
+	local camera = Workspace.CurrentCamera
+	if not anchor or not anchor.Parent or not camera then
+		return 0, math.huge
+	end
+	local position = anchor.Position
+	local projected, onScreen = camera:WorldToViewportPoint(position)
+	if not onScreen or projected.Z <= 0 then
+		return 0, math.huge
+	end
+	local offset = position - camera.CFrame.Position
+	local distanceSquared = offset:Dot(offset)
+	if self.lodFar > self.lodNear then
+		local scale = 1 - math.clamp((math.sqrt(distanceSquared) - self.lodNear) / (self.lodFar - self.lodNear), 0, 1)
+		return scale, distanceSquared
+	end
+	return 1, distanceSquared
+end
 
 --============== Конфиг/применение ==============
 
@@ -1547,7 +1624,7 @@ function Emitter:_applyConfig(config)
 	end
 	local baseMaxParticles = math.max(1, math.floor(tonumber(merged.maxParticles) or DEFAULT_CONFIG.maxParticles))
 	self._baseMaxParticles = baseMaxParticles
-	self.maxParticles = baseMaxParticles
+	self.maxParticles = math.max(0, math.floor(baseMaxParticles * _qualityMultiplier + 0.5))
 	local emissionDirection = merged.emissionDirection or DEFAULT_CONFIG.emissionDirection
 	if emissionDirection.Magnitude == 0 then
 		emissionDirection = Vector3.new(0, 1, 0)
@@ -1641,7 +1718,6 @@ function Emitter:_applyConfig(config)
 
 
 	-- LOD/отсечение
-	self.cullOutsideFov = (merged.cullOutsideFov == true)
 	self.lodNear = math.max(0, tonumber(merged.lodNear) or 0)
 	self.lodFar  = math.max(self.lodNear, tonumber(merged.lodFar)  or 0)
 
@@ -1801,7 +1877,7 @@ end
 
 --============== Спавн одной частицы ==============
 
-function Emitter:_spawnOne(isExplicitBurst: boolean?): boolean
+function Emitter:_spawnOne(): boolean
 	if self._alive >= self.maxParticles then
 		return false
 	end
@@ -1809,9 +1885,16 @@ function Emitter:_spawnOne(isExplicitBurst: boolean?): boolean
 	if not anchor or not anchor.Parent then
 		return false
 	end
-	local part = acquireCube(isExplicitBurst)
+	local part = acquireCube()
 	if not part then
 		return false
+	end
+	-- A new population starts at the current anchor transform, including after
+	-- pool warmup or camera culling while a local-space anchor was moving.
+	if self.localSpace and self._alive == 0 then
+		self._lastAnchorCF = anchor.CFrame
+		self._lastAnchorFrame = nil
+		self._anchorDelta = nil
 	end
 
 	self._alive += 1
@@ -2096,28 +2179,7 @@ function Emitter:_updateEmission(dt: number)
 		return
 	end
 
-	self._visibilityElapsed = (self._visibilityElapsed or VISIBILITY_POLL_INTERVAL) + dt
-	if not self:_updateLineOfSight(false) then
-		return
-	end
-
-	-- Кадровое отсечение / LOD: срезаем только rate
-	local rateMul = 1.0
-	local cam = Workspace.CurrentCamera
-	if cam then
-		local pos = anchor.Position
-		if self.cullOutsideFov then
-			local _, onScreen = cam:WorldToViewportPoint(pos)
-			if not onScreen then
-				rateMul = 0
-			end
-		end
-		if self.lodFar > self.lodNear then
-			local d = (cam.CFrame.Position - pos).Magnitude
-			local m = 1.0 - math.clamp((d - self.lodNear) / (self.lodFar - self.lodNear), 0, 1)
-			rateMul *= m
-		end
-	end
+	local rateMul = self._cameraScale
 	if rateMul <= 0 then
 		return
 	end
@@ -2462,7 +2524,12 @@ function Emitter:Emit(count: number): number
 		return 0
 	end
 
-	if not self:_updateLineOfSight(true) then
+	local cameraScale = self:_getCameraScale()
+	if cameraScale <= 0 or not self:_updateLineOfSight(true) then
+		return 0
+	end
+	count = math.floor(count * cameraScale * _qualityMultiplier)
+	if count <= 0 then
 		return 0
 	end
 
@@ -2475,8 +2542,8 @@ function Emitter:Emit(count: number): number
 		end
 	end
 
-	-- Локальный лимит эмиттера
-	local localCap = self.maxParticles - self._alive
+	-- Repeated bursts share the same bounded queue.
+	local localCap = self.maxParticles - self._alive - (self._spawnDemand or 0)
 	if localCap <= 0 then
 		return 0
 	end
@@ -2577,6 +2644,13 @@ function Emitter:Destroy()
 	end
 	self._destroyed = true
 	self._enabled = false
+	self._admitted = false
+	for index = #selectedEmitters, 1, -1 do
+		if selectedEmitters[index] == self then
+			table.remove(selectedEmitters, index)
+			break
+		end
+	end
 	for state in pairs(self._particles) do
 		releaseParticle(state)
 	end
@@ -2599,6 +2673,8 @@ function VoxelParticleSystem.newEmitter(anchor: BasePart, config: any?): Emitter
 	emitter._spawnDemand = 0
 	emitter._burstDemand = 0
 	emitter._enabled = false
+	emitter._admitted = false
+	emitter._cameraScale = 0
 	emitter._destroyed = false
 	emitter._serial = 0
 	emitter._seed32 = _u32(math.floor((os.clock()*1000000) % 0xFFFFFFFF))
@@ -2630,12 +2706,49 @@ function VoxelParticleSystem.GetTotalAlive(): number
 	return liveCount
 end
 
+function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
+	local result: any = {
+		Version = 16,
+		Frame = _frameSerial,
+		Ready = #pool + liveCount >= _baseMaxTotalParticles,
+		BaseCapacity = _baseMaxTotalParticles,
+		MaxTotalParticles = MAX_TOTAL_PARTICLES,
+		MaxActiveEmitters = maxActiveEmitters,
+		MaxSpawnsPerFrame = math.floor(128 * _qualityMultiplier),
+		FrameSpawnLimit = frameSpawnLimit,
+		QualityMultiplier = _qualityMultiplier,
+		RegisteredEmitters = #emitters,
+		SelectedEmitters = #selectedEmitters,
+		Alive = liveCount,
+		Pooled = #pool,
+		Allocated = #pool + liveCount,
+		PartCreationsThisFrame = partCreationsThisFrame,
+		SpawnsThisFrame = spawnsThisFrame,
+	}
+	if includeEmitters then
+		local details = {}
+		for _, emitter in emitters do
+			table.insert(details, {
+				Anchor = emitter.anchor and emitter.anchor:GetFullName() or "",
+				Admitted = emitter._admitted,
+				Alive = emitter._alive,
+				Pending = emitter._spawnDemand,
+				DistanceSquared = emitter._cameraDistanceSquared,
+			})
+		end
+		result.Emitters = details
+	end
+	return result
+end
+
 function VoxelParticleSystem.SetMaxTotalParticles(count: number)
+	assert(count == count and count < math.huge and count > 0, "Particle capacity must be a positive finite number")
 	local newMax = math.max(1, math.floor(count))
-	if newMax == MAX_TOTAL_PARTICLES then
+	if newMax == _baseMaxTotalParticles then
 		return
 	end
-	MAX_TOTAL_PARTICLES = newMax
+	_baseMaxTotalParticles = newMax
+	_applyQualityScaling()
 	if RunService:IsClient() then
 		ensureUpdateLoop()
 	end
@@ -2643,7 +2756,12 @@ end
 
 
 if RunService:IsClient() then
+	_updateQualityMultiplier()
+	_applyQualityScaling()
+	_connectQualitySignals()
 	ensureUpdateLoop()
+else
+	_applyQualityScaling()
 end
 
 return VoxelParticleSystem

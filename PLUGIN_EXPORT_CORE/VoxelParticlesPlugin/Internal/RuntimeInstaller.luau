@@ -21,8 +21,8 @@ local BundledSharedRuntime = {
 }
 local BundledPresets = Internal:WaitForChild("BundledPresets")
 
-local RUNTIME_VERSION = 13
-local INSTALLER_VERSION = 5
+local RUNTIME_VERSION = 16
+local INSTALLER_VERSION = 16
 local MANAGED_ATTRIBUTE = "VoxelParticlesPluginManaged"
 local VERSION_ATTRIBUTE = "VoxelParticlesRuntimeVersion"
 local INSTALLER_ATTRIBUTE = "VoxelParticlesInstallerVersion"
@@ -268,8 +268,14 @@ local function analyzeTarget(status, key, parent, name, className, bundled, cand
 		end
 	end
 
-	if not isFileSynced(owner) then
-		local currentSource = hasCurrentSource(owner, bundled)
+	local currentSource = hasCurrentSource(owner, bundled)
+	if isFileSynced(owner) then
+		if not currentSource then
+			status.needsUpdate = true
+			addConflict(status, ("Native Script Sync source differs from release v%d: %s. Update the complete runtime bundle in its mapped disk files, then rescan.")
+				:format(RUNTIME_VERSION, fullName(owner)))
+		end
+	else
 		local currentMetadata = owner:GetAttribute(VERSION_ATTRIBUTE) == RUNTIME_VERSION
 			and owner:GetAttribute(INSTALLER_ATTRIBUTE) == INSTALLER_VERSION
 			and owner:GetAttribute(ROLE_ATTRIBUTE) == key
@@ -391,7 +397,7 @@ function RuntimeInstaller.inspectRuntime()
 	else
 		status.ready = true
 		status.action = "Runtime ready"
-		status.message = "Voxel Particles runtime is ready."
+		status.message = ("Voxel Particles runtime v%d is ready."):format(RUNTIME_VERSION)
 	end
 	return status
 end
