@@ -1,5 +1,30 @@
 # Changelog
 
+## v21 — 2026-09-08
+
+- Added native planar launch spread and its editor controls. The configuration contract and example are in [README](README.md#flat-fan-spread-in-v21).
+- Kept the existing cone path and all 32 authored presets unchanged. Preset loading, saving and runtime configuration accept the new optional fields without migrating old presets.
+- Plugin, runtime and installer share version **21**; the complete artifact contains eight internal modules and 32 presets. Installation ownership behavior is unchanged.
+
+Release artifact: `dist/VoxelParticlesPlugin-v21.rbxmx`
+
+SHA-256: `13a3f34a9d5b16fc21564eff6ff197a64ee022d3a2b349f67b0e8a8aa7365344`
+
+Validation and installation record: [v21 verification](tools/V21_VERIFICATION.md).
+
+## v20 — 2026-09-05
+
+- Added the client-wide dot API `VoxelParticleSystem.SetSimulationPaused(paused: boolean)`. Idempotent pause/resume freezes emission, existing particle motion/lifetime/noise, interpolation, unmasking, admission, and pool warmup without changing emitter enabled states.
+- Paused `Emit()` requests return zero without building a backlog. Existing queued demand is preserved; real time and local-space anchor movement during pause are not replayed on resume. Quality reclamation waits for the first resumed frame.
+- Added `GetDiagnostics().SimulationPaused`. Existing emitter APIs, preview controls, installer ownership rules and presets retain their behavior.
+- Plugin, runtime, and installer share version **20**. The complete package contains eight internal modules and 32 presets.
+
+Release artifact: `dist/VoxelParticlesPlugin-v20.rbxmx`
+
+SHA-256: `3fe340f1fd4c446aac9586c7e5933a0df3548475a9e71735d5cc6ff3318b0e8e`
+
+Validation: manifest build and exact XML/source hierarchy validation; all 41 package sources compile. Lune functional tests execute the runtime at 30/60 FPS and the packaged installer for clean initialization, v19 update, preserved/custom and missing presets, idempotency, duplicate ownership, stale synced source and Edit-only installation. Luau analysis with `plugin-sourcemap.json` reports no diagnostics in changed sources; the unchanged binder template reports its game-runtime require path and weak-table annotation diagnostics. No Studio installation, Play, visual, load test or publication was performed.
+
 ## v19 — 2026-09-05
 
 - Reduced `sizeNoiseAmplitude` from 0.74 to 0.185 and `sizeNoiseFrequency` from 5.6 to 1.4 in both `Fire_1` and `SimpleFire`.

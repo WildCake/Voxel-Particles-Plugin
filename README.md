@@ -2,22 +2,22 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v19
+## Download v21
 
-[Download `VoxelParticlesPlugin-v19.rbxmx`](dist/VoxelParticlesPlugin-v19.rbxmx)
+[Download `VoxelParticlesPlugin-v21.rbxmx`](dist/VoxelParticlesPlugin-v21.rbxmx)
 
-SHA-256: `93e4de3632e6500a2965274c0b7e88b6537c398921979d5ea2577eec566710b0`
+SHA-256: `13a3f34a9d5b16fc21564eff6ff197a64ee022d3a2b349f67b0e8a8aa7365344`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v19**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v21**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **19**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **21**. The builder rejects mixed release numbers.
 
 ## Updating an existing project
 
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v19 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v21 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.
@@ -28,6 +28,40 @@ Updating the installed plugin does not replace runtime scripts already saved in 
 Use **Script Sync → Reveal in Explorer/Finder** to locate a mapped owner. If Studio presents a conflict after you have updated those files, select the reviewed disk version. See Roblox's [Script Sync guide](https://create.roblox.com/docs/scripting/sync).
 
 **Refreshing built-in effects:** the updater adds missing presets and preserves existing preset contents, including your edits. To adopt the v19 fire adjustments, replace `Fire_1` and `SimpleFire` with the matching files in [BundledPresets](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/BundledPresets). The bundle also includes v17's golden `tp2` gateway and corrected `Firethrower` and `Landing_1`–`Landing_4` mappings. Copy all bundled preset contents to reproduce the complete showcase. Keep any customized versions under separate preset names first. For Script Sync, edit the mapped disk files. Restart Play afterward because already-required presets remain cached for that session.
+
+## Flat fan spread in v21
+
+The Movement section now exposes **Spread mode: Cone / Flat fan** and **Fan plane normal X/Y/Z**. Presets save these native runtime settings:
+
+```luau
+local config = {
+	spreadMode = "fan",
+	spreadPlaneNormal = Vector3.yAxis,
+	emissionDirection = Vector3.xAxis,
+	spawnDirectionMode = "emission",
+	perParticle = { angle = { min = 0, max = 30 } },
+}
+```
+
+This emits a horizontal fan with a full width of 60 degrees. `perParticle.angle` remains an absolute deviation in degrees: fan mode samples it uniformly on either side of the emission axis, so a positive minimum leaves an angular gap at the center. A zero maximum emits along the axis. The plane normal is in the anchor's local coordinates and must be finite, non-zero and perpendicular to emission. Fan mode requires `spawnDirectionMode="emission"`; invalid combinations fail validation before changing the live preview.
+
+Fan controls the launch direction. Authored acceleration, wind, steering, noise, spawn offsets, cube size and lifetime curves still apply afterward. Configure again when the desired width changes; the existing particle population continues its own motion.
+
+Older presets omit these fields and retain the default `spreadMode="cone"` and their previous seeded behavior. The editor adds defaults in memory when loading, then includes the fields when explicitly saving. No preset migration or overwrite is required. The complete v21 package retains the v20 pause API below.
+
+## What's new in v20
+
+`VoxelParticleSystem.SetSimulationPaused(paused: boolean)` freezes the shared client simulation. One game controller should call this dot API for the authoritative pause state:
+
+```luau
+VoxelParticleSystem.SetSimulationPaused(true)
+-- Resume when the game's shared pause ends.
+VoxelParticleSystem.SetSimulationPaused(false)
+```
+
+Repeated calls with the same value are idempotent. Existing particles retain age, lifetime, noise, transforms, appearance, interpolation and pool ownership during pause. Emitter enabled states and pre-pause queued demand are preserved. `Emit()` requests made while paused return `0` and are discarded; continuous emission accumulates no paused time. Emitters attached during pause remain frozen too. Resume advances only subsequent frame time and ignores anchor movement that occurred during pause for local-space particles. Camera admission and quality reclamation resume with the current camera and quality budget.
+
+`SetEnabled(false)` retains its emission-only behavior. `Configure`, `SetEnabled`, and `Destroy` remain explicit caller operations during a simulation pause. `GetDiagnostics().SimulationPaused` reports the shared state. The bundled editor preview uses its own runtime module and retains its existing play/stop controls.
 
 ## What's new in v19
 
@@ -123,7 +157,9 @@ Python 3 is required. The builder preserves non-source Roblox metadata from an e
 ```powershell
 python -B tools/build_plugin.py `
   --template "$env:LOCALAPPDATA\Roblox\Plugins\VoxelParticlesPlugin.rbxmx" `
-  --output "dist\VoxelParticlesPlugin-v19.rbxmx"
+  --output "dist\VoxelParticlesPlugin-v20.rbxmx"
 ```
+
+With [Lune](https://lune-org.github.io/docs/) installed, run `lune run tools/test_simulation_pause.luau` and `lune run tools/test_runtime_installer.luau` from this repository. They execute the canonical runtime and packaged installer with controlled in-memory services; they do not substitute for Studio rendering, installation, or load tests.
 
 See [CHANGELOG.md](CHANGELOG.md) for release details and [AGENTS.md](AGENTS.md) for repository engineering rules.

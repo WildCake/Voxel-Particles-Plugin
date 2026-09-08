@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 19
+-- version 21
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -190,6 +190,7 @@ local selectedEmitters = table.create(MAX_ACTIVE_EMITTERS_HIGH) :: {EmitterInsta
 local selectVisibleEmitters: () -> ()
 -- Глобальные «часы» для rate-noise (одни на все эмиттеры)
 local _rateNoiseClock = 0
+local simulationPaused = false
 
 --==================== 32-bit counter-based PRNG (per-particle) ====================
 
@@ -304,6 +305,8 @@ local DEFAULT_CONFIG = {
 	maxParticles = 128,
 	emissionDirection = Vector3.new(0, 1, 0),
 	spawnDirectionMode = "emission", -- "emission", "radialOutward", "radialTangent", or "curveNormal"
+	spreadMode = "cone", -- "cone" (solid angle) or "fan" (signed angle in a plane)
+	spreadPlaneNormal = Vector3.new(0, 0, 1), -- anchor-local; fan emission must lie in this plane
 
 	-- новая спавн-геометрия
 	spawnShape = "point",                -- also supports "cylinderStream" and "cubicBezier"
@@ -456,8 +459,10 @@ local function _applyQualityScaling()
 			end
 		end
 	end
-	selectVisibleEmitters()
-	cameraAdmissionElapsed = 0
+	if not simulationPaused then
+		selectVisibleEmitters()
+		cameraAdmissionElapsed = 0
+	end
 end
 
 
@@ -1208,6 +1213,11 @@ local function ensureUpdateLoop()
 	-- An idle renderer starts with fresh admission instead of waiting one interval.
 	cameraAdmissionElapsed = CAMERA_ADMISSION_INTERVAL
 	updateConnection = RunService.RenderStepped:Connect(function(dt)
+		-- Freeze the rendered population too: admission, unmasking, interpolation
+		-- and all simulation clocks must observe the same pause boundary.
+		if simulationPaused then
+			return
+		end
 		debug.profilebegin("VPS.Frame")
 		_frameSerial += 1
 		_rateNoiseClock += dt
@@ -1474,6 +1484,19 @@ function Emitter:_applyConfig(config)
 	for key, value in pairs(config) do
 		merged[key] = value
 	end
+	assert(merged.spreadMode == "cone" or merged.spreadMode == "fan", "spreadMode must be cone or fan")
+	local fanSide = nil
+	if merged.spreadMode == "fan" then
+		assert(merged.spawnDirectionMode == "emission", "Fan spread requires emission direction mode")
+		local normal, direction = merged.spreadPlaneNormal, merged.emissionDirection
+		assert(typeof(normal) == "Vector3" and normal.Magnitude > 0 and normal.Magnitude < math.huge,
+			"spreadPlaneNormal must be a finite non-zero Vector3")
+		assert(typeof(direction) == "Vector3" and direction.Magnitude > 0 and direction.Magnitude < math.huge
+			and math.abs(normal.Unit:Dot(direction.Unit)) <= 1e-4,
+			"Fan emissionDirection must be finite, non-zero and perpendicular to spreadPlaneNormal")
+		fanSide = normal.Unit:Cross(direction.Unit).Unit
+	end
+	self._fanSide = fanSide
 
 	self._baseRate = math.max(0, tonumber(merged.rate) or 0)
 	if self._baseRate > 0 then
@@ -1896,11 +1919,17 @@ function Emitter:_spawnOne(): boolean
 		life = streamTravelDistance / speed
 	end
 
-	-- направление в конусе (на базе PRNG)
+	-- Начальное направление: плоский веер или прежний объёмный конус.
 	local baseDirection = (function()
 		local minA = math.clamp(math.rad(ranges.angleMin), 0, math.pi)
 		local maxA = math.clamp(math.rad(ranges.angleMax), 0, math.pi)
 		if minA > maxA then minA, maxA = maxA, minA end
+		if self._fanSide then
+			local angle = _p_next_number(_tmpState, minA, maxA)
+			if _p_next01(_tmpState) < 0.5 then angle = -angle end
+			local side = anchor.CFrame:VectorToWorldSpace(self._fanSide)
+			return (dirUnit * math.cos(angle) + side * math.sin(angle)).Unit
+		end
 		if self.spawnDirectionMode == "curveNormal" then
 			local _, normal, bitangent = _basisFromDir(curveTangent)
 			local normalAngle = _p_next_number(_tmpState, 0, math.pi * 2)
@@ -2407,7 +2436,7 @@ end
 --============== Публичный API ==============
 
 function Emitter:Emit(count: number): number
-	if self._destroyed then
+	if self._destroyed or simulationPaused then
 		return 0
 	end
 
@@ -2596,9 +2625,34 @@ function VoxelParticleSystem.GetTotalAlive(): number
 	return liveCount
 end
 
+-- One client owner controls the shared simulation; emitter enabled states stay intact.
+function VoxelParticleSystem.SetSimulationPaused(paused: boolean): ()
+	assert(typeof(paused) == "boolean", "Simulation pause must be a boolean")
+	if simulationPaused == paused then
+		return
+	end
+	simulationPaused = paused
+	if paused then
+		return
+	end
+	-- Anchor movement during pause is not deferred particle motion on resume.
+	for _, emitter in emitters do
+		if emitter.localSpace then
+			emitter._lastAnchorCF = emitter.anchor and emitter.anchor.CFrame or nil
+			emitter._lastAnchorFrame = nil
+			emitter._anchorDelta = nil
+		end
+	end
+	cameraAdmissionElapsed = CAMERA_ADMISSION_INTERVAL
+	if RunService:IsClient() then
+		ensureUpdateLoop()
+	end
+end
+
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 19,
+		Version = 21,
+		SimulationPaused = simulationPaused,
 		Frame = _frameSerial,
 		Ready = #pool + liveCount >= _baseMaxTotalParticles,
 		BaseCapacity = _baseMaxTotalParticles,

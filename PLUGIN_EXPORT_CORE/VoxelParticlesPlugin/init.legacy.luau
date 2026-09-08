@@ -48,7 +48,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 19
+local PLUGIN_VERSION = 21
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -208,6 +208,8 @@ local function defaultState()
 		maxParticles = 128,
 		emissionDirection = Vector3.new(0, 1, 0),
 		spawnDirectionMode = "emission",
+		spreadMode = "cone",
+		spreadPlaneNormal = Vector3.new(0, 0, 1),
 
 		spawnShape = "point",
 		spawnSize = Vector3.new(0, 0, 0),
@@ -322,6 +324,16 @@ end
 
 local function validateSpawnState(state)
 	local directionMode = state.spawnDirectionMode
+	assert(state.spreadMode == "cone" or state.spreadMode == "fan", "Spread mode must be Cone or Flat fan")
+	if state.spreadMode == "fan" then
+		assert(directionMode == "emission", "Flat fan requires Emission axis direction mode")
+		local normal, direction = state.spreadPlaneNormal, state.emissionDirection
+		assert(typeof(normal) == "Vector3" and normal.Magnitude > 0 and normal.Magnitude < math.huge,
+			"Fan plane normal must be a finite non-zero Vector3")
+		assert(typeof(direction) == "Vector3" and direction.Magnitude > 0 and direction.Magnitude < math.huge
+			and math.abs(normal.Unit:Dot(direction.Unit)) <= 1e-4,
+			"Fan emission direction must be finite, non-zero and perpendicular to the plane normal")
+	end
 	assert(
 		directionMode == "emission"
 			or directionMode == "radialOutward"
@@ -365,6 +377,8 @@ local function buildConfig(state)
 		maxParticles = state.maxParticles,
 		emissionDirection = state.emissionDirection,
 		spawnDirectionMode = state.spawnDirectionMode,
+		spreadMode = state.spreadMode,
+		spreadPlaneNormal = state.spreadPlaneNormal,
 
 		spawnShape = state.spawnShape,
 		spawnSize = state.spawnSize,
@@ -2458,6 +2472,21 @@ local function rebuildPanel(state)
 		state.emissionDirection = Vector3.new(state.emissionDirection.X, state.emissionDirection.Y, v)
 		scheduleApply()
 	end, formatFloat)
+	createSlider(movement, "Spread mode", 1, 2, if state.spreadMode == "fan" then 2 else 1, 1, function(v)
+		state.spreadMode = if v >= 1.5 then "fan" else "cone"
+		scheduleApply()
+	end, function(v) return if v >= 1.5 then "Flat fan" else "Cone" end)
+	createSubLabel(movement, "Flat fan uses Angle min/max on both sides of the emission axis. Plane normal is anchor-local and perpendicular to emission; Y = 1 gives a horizontal fan for X/Z emission. Later steering and forces still apply.", true)
+	for _, component in ipairs({ "X", "Y", "Z" }) do
+		createSlider(movement, "Fan plane normal " .. component, -1, 1, state.spreadPlaneNormal[component], 0.05, function(v)
+			local normal = state.spreadPlaneNormal
+			state.spreadPlaneNormal = Vector3.new(
+				if component == "X" then v else normal.X,
+				if component == "Y" then v else normal.Y,
+				if component == "Z" then v else normal.Z)
+			scheduleApply()
+		end, formatFloat)
+	end
 	createSlider(movement, "Wind X", -20, 20, state.wind.X, 0.5, function(v)
 		state.wind = Vector3.new(v, state.wind.Y, state.wind.Z)
 		scheduleApply()
