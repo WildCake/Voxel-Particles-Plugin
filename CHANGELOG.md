@@ -1,5 +1,16 @@
 # Changelog
 
+## v22 — 2026-09-09
+
+- Added explicit emission retirement through [StopEmission](README.md#stopping-emission-in-v22). Existing particle motion, presets, SetEnabled, Emit and simulation pause semantics are unchanged.
+- Plugin, runtime and installer share version **22**. Package membership remains eight internal modules and 32 presets; installer logic is unchanged.
+
+Release artifact: `dist/VoxelParticlesPlugin-v22.rbxmx`
+
+SHA-256: `4165ed5b587bb8bf7ead73de909e23a25645e7f85ac0658173fe54aa464ae300`
+
+Validation and installation scope: [v22 verification](tools/V22_VERIFICATION.md).
+
 ## v21 — 2026-09-08
 
 - Added native planar launch spread and its editor controls. The configuration contract and example are in [README](README.md#flat-fan-spread-in-v21).

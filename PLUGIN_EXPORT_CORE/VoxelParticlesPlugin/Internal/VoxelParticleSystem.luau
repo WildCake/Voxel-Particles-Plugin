@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 21
+-- version 22
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -2516,6 +2516,16 @@ function Emitter:SetEnabled(enabled: boolean)
 		self._enabled = false
 	end
 end
+-- End this emission request without discarding its living population or anchor.
+function Emitter:StopEmission()
+	if self._destroyed then return end
+	self._enabled = false
+	self._spawnDemand = 0
+	self._burstDemand = 0
+	self._accumulator = 0
+	self._quotaDebt = 0
+end
+
 function Emitter:IsEnabled(): boolean
 	return self._enabled
 end
@@ -2651,7 +2661,7 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 21,
+		Version = 22,
 		SimulationPaused = simulationPaused,
 		Frame = _frameSerial,
 		Ready = #pool + liveCount >= _baseMaxTotalParticles,

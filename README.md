@@ -2,22 +2,26 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v21
+## Download v22
 
-[Download `VoxelParticlesPlugin-v21.rbxmx`](dist/VoxelParticlesPlugin-v21.rbxmx)
+[Download `VoxelParticlesPlugin-v22.rbxmx`](dist/VoxelParticlesPlugin-v22.rbxmx)
 
-SHA-256: `13a3f34a9d5b16fc21564eff6ff197a64ee022d3a2b349f67b0e8a8aa7365344`
+SHA-256: `4165ed5b587bb8bf7ead73de909e23a25645e7f85ac0658173fe54aa464ae300`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v21**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v22**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **21**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **22**. The builder rejects mixed release numbers.
+
+## Stopping emission in v22
+
+Call `emitter:StopEmission()` when an effect ends naturally. It disables continuous emission and cancels queued rate and burst demand, including fractional emission credit and allocator debt. Existing particles keep their anchor, motion and full lifetime; the call does not change admission or reset the one-time enable-burst state. It is idempotent, safe after Destroy and applies immediately during simulation pause. Explicit subsequent `Emit()` or `SetEnabled(true)` calls can request emission again. The existing SetEnabled, Emit and shared pause behavior remains unchanged.
 
 ## Updating an existing project
 
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v21 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v22 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.
