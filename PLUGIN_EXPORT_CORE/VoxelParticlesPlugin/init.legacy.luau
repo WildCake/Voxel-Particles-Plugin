@@ -50,7 +50,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 23
+local PLUGIN_VERSION = 24
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -114,7 +114,8 @@ local STOP_COLOR = Color3.fromRGB(200, 90, 90)
 
 -- Edit = превью работает, Play = отключаем превью (рантайм-биндер сам всё запустит)
 local function isPlayMode()
-	return RunService:IsRunning()
+	-- Paused Play is still a simulation, not an authoring session.
+	return not RunService:IsEdit()
 end
 
 
@@ -622,6 +623,19 @@ positionLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
 positionLabel.TextXAlignment = Enum.TextXAlignment.Left
 positionLabel.Text = "World CFrame: n/a"
 positionLabel.Parent = header
+
+local previewPolicyLabel = Instance.new("TextLabel")
+previewPolicyLabel.Name = "PreviewPolicy"
+previewPolicyLabel.Size = UDim2.new(1, 0, 0, 18)
+previewPolicyLabel.AutomaticSize = Enum.AutomaticSize.Y
+previewPolicyLabel.BackgroundTransparency = 1
+previewPolicyLabel.Font = Enum.Font.Gotham
+previewPolicyLabel.TextSize = 12
+previewPolicyLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+previewPolicyLabel.TextXAlignment = Enum.TextXAlignment.Left
+previewPolicyLabel.TextWrapped = true
+previewPolicyLabel.Text = "Studio preview: full density. Quality and LOD apply in Play."
+previewPolicyLabel.Parent = header
 
 local displayRow = Instance.new("Frame")
 displayRow.Size = UDim2.new(1, 0, 0, 28)
@@ -2637,6 +2651,18 @@ local function rebuildPanel(state)
 		scheduleApply()
 	end, formatInteger)
 	local lodFarSlider
+	local lodHint = Instance.new("TextLabel")
+	lodHint.Name = "LodPolicy"
+	lodHint.Size = UDim2.new(1, 0, 0, 18)
+	lodHint.AutomaticSize = Enum.AutomaticSize.Y
+	lodHint.BackgroundTransparency = 1
+	lodHint.Font = Enum.Font.Gotham
+	lodHint.TextSize = 12
+	lodHint.TextColor3 = Color3.fromRGB(180, 180, 190)
+	lodHint.TextXAlignment = Enum.TextXAlignment.Left
+	lodHint.TextWrapped = true
+	lodHint.Text = "Play: distance fade starts at 70 studs or LOD near, whichever is farther. Fade range is preserved; shared limits still apply."
+	lodHint.Parent = updateContent
 	createSlider(updateContent, "LOD near", 0, 600, state.lodNear, 1, function(v)
 		state.lodNear = math.max(0, math.floor(v + 0.5))
 		if state.lodFar < state.lodNear then
@@ -3319,6 +3345,7 @@ destroyPreview = function()
 		pcall(function() previewEmitter:Destroy() end)
 		previewEmitter = nil
 	end
+	VPS.SetAuthoringPreviewEnabled(false)
 
 	lastPreviewAnchorCFrame = nil
 end
@@ -3358,6 +3385,7 @@ applyPreview = function()
 	-- Создание или обновление эмиттера
 	if not previewEmitter then
 		local ok, res = pcall(function()
+			VPS.SetAuthoringPreviewEnabled(true)
 			return VPS.Attach(currentEmitter, cfg)
 		end)
 		if ok then

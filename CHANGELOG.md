@@ -1,5 +1,19 @@
 # Changelog
 
+## v24 — 2026-09-18
+
+- Gameplay distance fading now starts no earlier than 70 studs and preserves the authored fade width. Continuous emission and bursts share this rule; quality, global budgets, local limits and viewport culling still apply.
+- Made Studio Edit preview use authored density without quality, camera/LOD, soft-budget, global particle-cap, frame-spawn or pool-warmup reductions. Authored rate noise, lifetime, enabled state and maximum particle count remain in effect.
+- Kept preview allocation bounded by authored emitter limits, with pool reuse and cleanup on configuration changes and destruction. Gameplay keeps its existing budget policy. Preview mode belongs to the bundled renderer and is never saved into presets.
+- Added a preview-policy label and excluded paused Play from editor preview using `RunService:IsEdit()`.
+- Plugin, runtime and installer share version 24. Package: one entry, nine internal modules and 32 presets. Exact v23 runtime remains eligible for update; edited and synced sources remain protected.
+
+Release artifact: `dist/VoxelParticlesPlugin-v24.rbxmx`
+
+SHA-256: `66bfd5b634763743cb87129008d624b9c3eecf8abc16ac07b214bd359b4ddbeb`
+
+Validation: manifest/XML/source checks, compilation of all 42 sources, scoped Luau analysis, pure distance-arithmetic checks (70-stud boundary, preserved fade width, later/disabled LOD), and in-memory installer checks including v23-to-v24 updates, earlier releases, and edited/synced source protection. No particle execution, Studio preview, Play, performance measurement, installation or publication was performed.
+
 ## v23 — 2026-09-18
 
 - Separated editor authoring/preview from project runtime installation. Customized and synced runtime no longer disables the editor. Added source export for disk-owned presets and an explicit read-only bundled preset library before installation.

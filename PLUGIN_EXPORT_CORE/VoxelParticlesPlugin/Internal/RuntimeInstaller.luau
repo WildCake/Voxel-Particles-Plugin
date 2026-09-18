@@ -21,8 +21,8 @@ local BundledSharedRuntime = {
 }
 local BundledPresets = Internal:WaitForChild("BundledPresets")
 
-local RUNTIME_VERSION = 23
-local INSTALLER_VERSION = 23
+local RUNTIME_VERSION = 24
+local INSTALLER_VERSION = 24
 local MANAGED_ATTRIBUTE = "VoxelParticlesPluginManaged"
 local VERSION_ATTRIBUTE = "VoxelParticlesRuntimeVersion"
 local INSTALLER_ATTRIBUTE = "VoxelParticlesInstallerVersion"
@@ -41,6 +41,7 @@ local LEGACY_FINGERPRINTS = {
 		{ length = 92039, djb2 = 880809626, sdbm = 1144007767 },
 		{ length = 93371, djb2 = 3438957004, sdbm = 3636166175 },
 		{ length = 93638, djb2 = 1104975223, sdbm = 481698440 },
+		{ length = 92862, djb2 = 2436216848, sdbm = 151622191 }, -- v23
 	},
 	VoxelEmitterBinder = {
 		{ length = 5374, djb2 = 1141971026, sdbm = 2214730513 },

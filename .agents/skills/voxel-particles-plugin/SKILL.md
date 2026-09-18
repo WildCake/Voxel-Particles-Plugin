@@ -32,8 +32,10 @@ Native Script Sync owns mapped project source. RuntimeInstaller may inspect it b
 
 ## Runtime invariants
 
+- Gameplay distance fading begins at `max(70, lodNear)` with the authored width `lodFar - lodNear`. This common multiplier covers rate and bursts; it must never override quality, shared budgets, local limits or viewport culling.
 - `ClientVfxQuality` is client-only and owns the saved-quality cap, frame-pressure tier, diagnostics, and tier-change event.
-- Minimum quality retains positive emission density (15%); ordinary saved-quality settings and frame-pressure tiers must not switch effects off. Positive rates retain fractional credit and positive bursts request at least one particle. Explicit disabled/burst settings, camera culling, and shared hard budgets keep their meaning. Full emergency shutdown requires a separately designed severe-FPS policy; v23 does not introduce one.
+- Gameplay Minimum quality retains positive emission density (15%); ordinary saved-quality settings and frame-pressure tiers must not switch effects off. Positive rates retain fractional credit and positive bursts request at least one particle. Explicit disabled/burst settings, camera culling, and shared hard budgets keep their meaning. Full emergency shutdown requires a separately designed severe-FPS policy; none is implemented.
+- Studio Edit preview explicitly uses authored density on the bundled renderer: no quality/FPS-pressure scaling, camera/LOD culling, soft-budget shaping, gameplay capacity/frame quotas or pool-warmup suppression. Authored effect settings remain in force; capacity and cleanup follow the authored emitter limits. Do not serialize preview mode into presets or enable it in gameplay, including paused Play.
 - Annulus sampling stays uniform by area and accepts only equal positive X/Z outer radii with `0 <= inner < outer`.
 - Radial direction modes use the actual sampled offset. A zero offset retains emission-axis behavior.
 - Invalid editor state is rejected before configuring a live preview emitter.

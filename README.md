@@ -2,15 +2,31 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v23
+## Download v24
 
-[Download `VoxelParticlesPlugin-v23.rbxmx`](dist/VoxelParticlesPlugin-v23.rbxmx)
+[Download `VoxelParticlesPlugin-v24.rbxmx`](dist/VoxelParticlesPlugin-v24.rbxmx)
 
-SHA-256: `84683be4e15345da5259d1b25a7591d45f40e315ea910b1ecc30a7b506a6c6a1`
+SHA-256: `66bfd5b634763743cb87129008d624b9c3eecf8abc16ac07b214bd359b4ddbeb`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v23**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v24**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **23**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **24**. The builder rejects mixed release numbers.
+
+## Full-density Studio preview in v24
+
+The plugin's Edit preview uses the authored emission rate, burst count and maximum particle count. Saved graphics quality, automatic frame-pressure tiers, camera distance/viewport culling, shared gameplay capacity, soft budget shaping, frame-spawn quotas and pool warmup do not reduce preview density. The editor labels this policy; LOD controls still save the intended settings for Play.
+
+Authored `enabled`, burst-only `rate=0`, rate noise, lifetime, simulation/update steps and `maxParticles` retain their meaning. Preview capacity equals the sum of attached emitters' authored limits; Parts are allocated as needed, reused and released when previews are destroyed. No preview flag is saved into a preset or game settings. Gameplay retains its existing quality and budget policy.
+
+The editor explicitly enables `VoxelParticleSystem.SetAuthoringPreviewEnabled(true)` on its separate bundled renderer before attaching previews and disables it after destroying them. Mode changes require an empty renderer. This API is for Studio Edit only; paused Play remains a simulation, as distinguished by [`RunService:IsEdit()`](https://create.roblox.com/docs/reference/engine/classes/RunService#IsEdit) (documentation checked 2026-09-18).
+
+Updating the plugin is enough to adopt this preview fix, including in custom or native-synced projects. Updating project runtime is a separate operation.
+
+## Gameplay distance fade in v24
+
+Distance alone never reduces visible emission within **70 studs** of the camera. An enabled LOD fade begins at `max(70, lodNear)` and keeps its authored transition width `lodFar - lodNear`: for example, `0..191` becomes `70..261`, and `90..190` remains unchanged. Equal near/far values still disable distance fading. Both continuous emission and bursts use this policy through the common camera scale.
+
+This is only a distance multiplier. Saved quality, frame pressure, shared particle/spawn limits, authored per-emitter limits and viewport culling still take precedence in gameplay; proximity does not force particles past those limits. Projects need the v24 runtime to adopt this gameplay change.
 
 ## Authoring and custom projects in v23
 
@@ -20,7 +36,7 @@ The updater preserves native Script Sync source and user-modified runtime, inclu
 
 **Export source** opens selectable Luau text for the current preset settings. Copy it to the appropriate disk-owned preset; export never overwrites Studio source or marks edits as saved. A missing or invalid preset is identified explicitly. One failing preset does not stop the runtime binder from attaching other emitters. Both preview and binder accept a config table, `{ state = config }`, or a factory returning either form.
 
-Minimum quality keeps **15% density**. Positive rates retain fractional emission credit, and positive bursts request at least one particle. Visible emitters share the existing particle/frame quotas without a quality-dependent emitter-count cutoff. Explicit `enabled=false`, burst-only `rate=0`, camera culling and exhausted shared budgets still apply; no automatic complete shutdown is introduced.
+In gameplay, Minimum quality keeps **15% density**. Positive rates retain fractional emission credit, and positive bursts request at least one particle. Visible emitters share the existing particle/frame quotas without a quality-dependent emitter-count cutoff. Explicit `enabled=false`, burst-only `rate=0`, camera culling and exhausted shared budgets still apply; no automatic complete shutdown is introduced.
 
 Games can supply an optional ceiling through `ClientVfxQuality.SetQualityCap(ClientVfxQuality.Tier.Low)`. Use one settings owner and call `SetQualityCap(nil)` when releasing that preference. The shared module has no dependency on any game's settings UI. Roblox saved quality and frame pressure continue to constrain the effective tier.
 
@@ -33,7 +49,7 @@ Call `emitter:StopEmission()` when an effect ends naturally. It disables continu
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v23 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v24 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.

@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 23
+-- version 24
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -31,6 +31,14 @@ local _UNMASK_AT = setmetatable({} :: {[BasePart]: number}, {__mode = "k"}) -- p
 
 -- Приближение к лимиту частиц, после которого режем rate/burst
 local ADAPTIVE_THRESHOLD = 0.50 -- 50%
+local MIN_LOD_DISTANCE = 70
+
+local function distanceScale(distance: number, near: number, far: number): number
+	if far <= near then return 1 end -- authored LOD is disabled
+	-- Move an early fade outward without shortening its authored transition range.
+	local fadeStart = math.max(MIN_LOD_DISTANCE, near)
+	return 1 - math.clamp((distance - fadeStart) / (far - near), 0, 1)
+end
 
 -- Быстрый «волновой» шум вместо
 local _WAVE_RES = 256
@@ -157,6 +165,8 @@ local CAMERA_ADMISSION_INTERVAL = 1 / 15
 local cameraAdmissionElapsed = CAMERA_ADMISSION_INTERVAL
 
 local _qualityMultiplier = 1
+-- The bundled editor renderer opts in; installed gameplay renderers keep budgets.
+local authoringPreview = false
 local _qualityConnections = table.create(0)
 local _qualitySignalsConnected = false
 
@@ -169,7 +179,28 @@ local partCreationsThisFrame = 0
 local spawnsThisFrame = 0
 local frameSpawnLimit = 0
 
+local function emitterSpawnLimit(emitter: EmitterInstance): number
+	return if authoringPreview then emitter.maxParticles else MAX_SPAWN_PER_FRAME
+end
+
+local function globalSpawnLimit(): number
+	return if authoringPreview then MAX_TOTAL_PARTICLES else math.floor(128 * _qualityMultiplier)
+end
+
+local function poolCapacity(): number
+	return if authoringPreview then MAX_TOTAL_PARTICLES else _baseMaxTotalParticles
+end
+
+local function trimPool()
+	local reusableCapacity = math.max(0, poolCapacity() - liveCount)
+	while #pool > reusableCapacity do
+		local part = table.remove(pool)
+		if part then part:Destroy() end
+	end
+end
+
 local function _budgetMul(): number
+	if authoringPreview then return 1 end
 	local limit = MAX_TOTAL_PARTICLES
 	if limit <= 0 then return 1 end
 	local ratio = liveCount / limit
@@ -429,7 +460,7 @@ local function createCube(): BasePart
 end
 
 local function _readGraphicsQualityRatio(): number
-	if ClientVfxQuality == nil then
+	if authoringPreview or ClientVfxQuality == nil then
 		return 1
 	end
 	return ClientVfxQuality.GetParticleMultiplier()
@@ -443,6 +474,13 @@ end
 -- [REPLACE WHOLE FUNCTION] _applyQualityScaling
 local function _applyQualityScaling()
 	MAX_TOTAL_PARTICLES = math.max(1, math.floor(_baseMaxTotalParticles * _qualityMultiplier + 0.5))
+	if authoringPreview then
+		-- Authored emitter limits bound preview memory, without the game's global cap.
+		MAX_TOTAL_PARTICLES = 0
+		for _, emitter in emitters do
+			MAX_TOTAL_PARTICLES += emitter._baseMaxParticles
+		end
+	end
 	for _, emitter in ipairs(emitters) do
 		emitter.maxParticles = math.max(1, math.floor(emitter._baseMaxParticles * _qualityMultiplier + 0.5))
 		if emitter._baseRate == nil then
@@ -460,6 +498,7 @@ local function _applyQualityScaling()
 		selectVisibleEmitters()
 		cameraAdmissionElapsed = 0
 	end
+	if authoringPreview then trimPool() end
 end
 
 
@@ -494,6 +533,10 @@ local function acquireCube(): BasePart?
 		return nil
 	end
 	local part = table.remove(pool)
+	if not part and authoringPreview then
+		part = createCube()
+		partCreationsThisFrame += 1
+	end
 	if not part then
 		return nil
 	end
@@ -518,7 +561,7 @@ local function releaseCube(part: BasePart)
 	part.Size = Vector3.new(0.5, 0.5, 0.5)
 	part.CFrame = CFrame.new()
 	liveCount = math.max(0, liveCount - 1)
-	local reusableCapacity = math.max(0, _baseMaxTotalParticles - liveCount)
+	local reusableCapacity = math.max(0, poolCapacity() - liveCount)
 	if #pool >= reusableCapacity then
 		part:Destroy()
 		return
@@ -533,11 +576,10 @@ local function releaseCube(part: BasePart)
 end
 
 local function warmPoolWithinFrameBudget()
-	local reusableCapacity = math.max(0, _baseMaxTotalParticles - liveCount)
-	while #pool > reusableCapacity do
-		local part = table.remove(pool)
-		if part then part:Destroy() end
-	end
+	trimPool()
+	-- Preview allocates on demand up to the authored limits, without an 8/frame ramp.
+	if authoringPreview then return end
+	local reusableCapacity = math.max(0, poolCapacity() - liveCount)
 	local missing = reusableCapacity - #pool
 	local remainingBudget = MAX_POOLED_PART_CREATIONS_PER_FRAME - partCreationsThisFrame
 	local createCount = math.max(0, math.min(missing, remainingBudget))
@@ -1135,7 +1177,7 @@ local function spawnDemandPhase(quota: number, explicitBurst: boolean): number
 			demand = localCap
 		end
 		demand = math.min(demand,
-			math.max(0, math.floor(MAX_SPAWN_PER_FRAME * _qualityMultiplier) - emitter._spawnedThisFrame))
+			math.max(0, math.floor(emitterSpawnLimit(emitter) * _qualityMultiplier) - emitter._spawnedThisFrame))
 
 		if demand > 0 then
 			count += 1
@@ -1212,7 +1254,7 @@ local function ensureUpdateLoop()
 		debug.profilebegin("VPS.PoolWarmup")
 		warmPoolWithinFrameBudget()
 		debug.profileend()
-		local poolReady = #pool + liveCount >= _baseMaxTotalParticles
+		local poolReady = authoringPreview or #pool + liveCount >= _baseMaxTotalParticles
 		debug.profilebegin("VPS.Admission")
 		cameraAdmissionElapsed += dt
 		if cameraAdmissionElapsed >= CAMERA_ADMISSION_INTERVAL then
@@ -1226,8 +1268,8 @@ local function ensureUpdateLoop()
 		end
 		debug.profileend()
 
-		-- Continuous and burst requests share one quality-scaled frame budget.
-		local GLOBAL_MAX_SPAWN_PER_FRAME = math.floor(128 * _qualityMultiplier)
+		-- Gameplay shares a frame budget; preview can fill the authored capacity.
+		local GLOBAL_MAX_SPAWN_PER_FRAME = globalSpawnLimit()
 		frameSpawnLimit = GLOBAL_MAX_SPAWN_PER_FRAME
 
 		local function spawnDRR()
@@ -1238,7 +1280,7 @@ local function ensureUpdateLoop()
 				return
 			end
 
-			-- Emission only borrows prewarmed Parts, including explicit bursts.
+			-- Gameplay only borrows prewarmed Parts; preview can allocate on demand.
 			local burstSpawned = spawnDemandPhase(
 				math.min(available, GLOBAL_MAX_SPAWN_PER_FRAME),
 				true
@@ -1247,13 +1289,13 @@ local function ensureUpdateLoop()
 			available = MAX_TOTAL_PARTICLES - liveCount
 			local frameQuota = GLOBAL_MAX_SPAWN_PER_FRAME - burstSpawned
 			spawnDemandPhase(
-				math.min(available, frameQuota, #pool),
+				math.min(available, frameQuota, if authoringPreview then available else #pool),
 				false
 			)
 
 			for index = 1, #selectedEmitters do
 				local emitter = selectedEmitters[index]
-				local backlogCap = math.min(emitter.maxParticles - emitter._alive, MAX_SPAWN_PER_FRAME * 4)
+				local backlogCap = math.min(emitter.maxParticles - emitter._alive, emitterSpawnLimit(emitter) * 4)
 				if backlogCap < 0 then
 					backlogCap = 0
 				end
@@ -1434,7 +1476,7 @@ end
 
 
 local function stopUpdateLoopIfIdle()
-	local poolReady = #pool + liveCount >= _baseMaxTotalParticles
+	local poolReady = authoringPreview or #pool + liveCount >= _baseMaxTotalParticles
 	if updateConnection and #emitters == 0 and #particles == 0 and poolReady then
 		updateConnection:Disconnect()
 		updateConnection = nil
@@ -1444,6 +1486,9 @@ end
 -- Camera visibility is shared by continuous emission, explicit bursts and admission.
 function Emitter:_getCameraScale(): (number, number)
 	local anchor = self.anchor
+	if authoringPreview then
+		return if anchor and anchor.Parent then 1 else 0, 0
+	end
 	local camera = Workspace.CurrentCamera
 	if not anchor or not anchor.Parent or not camera then
 		return 0, math.huge
@@ -1455,11 +1500,7 @@ function Emitter:_getCameraScale(): (number, number)
 	end
 	local offset = position - camera.CFrame.Position
 	local distanceSquared = offset:Dot(offset)
-	if self.lodFar > self.lodNear then
-		local scale = 1 - math.clamp((math.sqrt(distanceSquared) - self.lodNear) / (self.lodFar - self.lodNear), 0, 1)
-		return scale, distanceSquared
-	end
-	return 1, distanceSquared
+	return distanceScale(math.sqrt(distanceSquared), self.lodNear, self.lodFar), distanceSquared
 end
 
 --============== Конфиг/применение ==============
@@ -2117,8 +2158,9 @@ function Emitter:_updateEmission(dt: number)
 	self._accumulator -= toEmit
 
 	-- Локальные ограничения на кадр и оставшуюся ёмкость эмиттера
-	if toEmit > MAX_SPAWN_PER_FRAME then
-		toEmit = MAX_SPAWN_PER_FRAME
+	local spawnLimit = emitterSpawnLimit(self)
+	if toEmit > spawnLimit then
+		toEmit = spawnLimit
 	end
 	local localCap = self.maxParticles - self._alive
 	if localCap <= 0 then
@@ -2131,7 +2173,7 @@ function Emitter:_updateEmission(dt: number)
 	-- Копим «спрос» этого эмиттера на текущий кадр
 	self._spawnDemand = (self._spawnDemand or 0) + toEmit
 	-- Мягкое ограничение бэклога, чтобы не копить бесконечно
-	local backlogCap = math.min(self.maxParticles - self._alive, MAX_SPAWN_PER_FRAME * 4)
+	local backlogCap = math.min(self.maxParticles - self._alive, spawnLimit * 4)
 	if backlogCap < 0 then backlogCap = 0 end
 	if self._spawnDemand > backlogCap then
 		self._spawnDemand = backlogCap
@@ -2452,9 +2494,10 @@ function Emitter:Emit(count: number): number
 		count = localCap
 	end
 
-	-- Per‑emitter cap на кадр, чтобы убрать пиковую нагрузку
-	if count > MAX_SPAWN_PER_FRAME then
-		count = MAX_SPAWN_PER_FRAME
+	-- Gameplay caps bursts per frame; preview keeps the authored burst count.
+	local spawnLimit = emitterSpawnLimit(self)
+	if count > spawnLimit then
+		count = spawnLimit
 	end
 
 	-- Не спавним немедленно: копим запрос и отдаём в общий кадровый аллокатор
@@ -2512,6 +2555,7 @@ end
 
 function Emitter:Configure(config)
 	self:_applyConfig(config)
+	if authoringPreview then _applyQualityScaling() end
 end
 
 function Emitter:SetCubicBezier(p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3)
@@ -2572,6 +2616,7 @@ function Emitter:Destroy()
 			break
 		end
 	end
+	if authoringPreview then _applyQualityScaling() end
 	stopUpdateLoopIfIdle()
 end
 
@@ -2600,6 +2645,7 @@ function VoxelParticleSystem.newEmitter(anchor: BasePart, config: any?): Emitter
 
 	emitter:_applyConfig(config)
 	table.insert(emitters, emitter)
+	if authoringPreview then _applyQualityScaling() end
 	if config == nil or config.enabled ~= false then
 		emitter:SetEnabled(true)
 	end
@@ -2609,6 +2655,19 @@ end
 
 function VoxelParticleSystem.Attach(anchor: BasePart, config: any?): EmitterInstance
 	return VoxelParticleSystem.newEmitter(anchor, config)
+end
+
+-- Opt in only on the editor's separate bundled renderer, before attaching previews.
+-- This is renderer state, never serialized into authored presets or project settings.
+function VoxelParticleSystem.SetAuthoringPreviewEnabled(enabled: boolean): ()
+	assert(typeof(enabled) == "boolean", "Authoring preview must be a boolean")
+	if authoringPreview == enabled then return end
+	assert(#emitters == 0, "Destroy emitters before changing the renderer's authoring mode")
+	assert(not enabled or (RunService:IsStudio() and RunService:IsEdit()),
+		"Authoring preview is available only in Studio Edit")
+	authoringPreview = enabled
+	_qualityMultiplier = _computeParticleMultiplier(_readGraphicsQualityRatio())
+	_applyQualityScaling()
 end
 
 function VoxelParticleSystem.GetTotalAlive(): number
@@ -2641,13 +2700,14 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 23,
+		Version = 24,
+		AuthoringPreview = authoringPreview,
 		SimulationPaused = simulationPaused,
 		Frame = _frameSerial,
-		Ready = #pool + liveCount >= _baseMaxTotalParticles,
-		BaseCapacity = _baseMaxTotalParticles,
+		Ready = authoringPreview or #pool + liveCount >= _baseMaxTotalParticles,
+		BaseCapacity = poolCapacity(),
 		MaxTotalParticles = MAX_TOTAL_PARTICLES,
-		MaxSpawnsPerFrame = math.floor(128 * _qualityMultiplier),
+		MaxSpawnsPerFrame = globalSpawnLimit(),
 		FrameSpawnLimit = frameSpawnLimit,
 		QualityMultiplier = _qualityMultiplier,
 		RegisteredEmitters = #emitters,
