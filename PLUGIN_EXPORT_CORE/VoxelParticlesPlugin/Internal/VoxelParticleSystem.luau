@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 24
+-- version 25
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -647,6 +647,17 @@ local function evaluateCurve(alpha: number, startValue: number, midValue: number
 		local t = (alpha - 0.5) / 0.5
 		return midValue + (endValue - midValue) * t
 	end
+end
+
+local function evaluateSizeMultiplier(emitter: any, progress: number, age: number, particleSeed: number): number
+	local curve = emitter.curves.size
+	local multiplier = if curve then evaluateCurve(progress, curve[1], curve[2], curve[3]) else 1
+	if emitter._useSizeNoise then
+		local seed = emitter.sizeNoiseSeed or emitter.lifeNoiseSeed or emitter.rateNoiseSeed or particleSeed
+		local noise = waveNoiseCached(age * emitter.sizeNoiseFrequency, seed)
+		multiplier *= math.max(0, 1 + emitter.sizeNoiseAmplitude * noise)
+	end
+	return math.max(multiplier, 0.01)
 end
 
 
@@ -1872,7 +1883,8 @@ function Emitter:_spawnOne(): boolean
 	local speed = _p_next_number(_tmpState, ranges.speedMin, ranges.speedMax)
 	local sizeValue = _p_next_number(_tmpState, ranges.sizeMin, ranges.sizeMax)
 	local sizeVector = Vector3.new(sizeValue, sizeValue, sizeValue)
-	part.Size = sizeVector
+	-- Initialize before the first visible frame, independently of sizeUpdateStep.
+	part.Size = sizeVector * evaluateSizeMultiplier(self, 0, 0, pseed)
 
 	-- ЛОКАЛЬНОЕ направление из пресета (в осях эмиттера).
 	-- Здесь self.emissionDirection трактуем как ЛОКАЛЬНЫЙ вектор.
@@ -2398,28 +2410,9 @@ function Emitter:_stepParticle(state: ParticleState, dt: number, drySimulate: bo
 	end
 
 
-	-- размер
-	local sizeCurve = self.curves.size
-	local sizeMultiplier = 1
-	if sizeCurve then
-		sizeMultiplier = evaluateCurve(progress, sizeCurve[1], sizeCurve[2], sizeCurve[3])
-	end
-
-	-- Пер-частичный временной нойз масштаба (общая частота и сид при желании)
-	if self._useSizeNoise then
-		local t = state.age * self.sizeNoiseFrequency -- «время» нойза = возраст частицы
-		-- сид берём по цепочке: явный -> life -> rate -> (fallback) per-particle seed
-		local seed = (self.sizeNoiseSeed ~= nil and self.sizeNoiseSeed)
-			or self.lifeNoiseSeed or self.rateNoiseSeed or state.prngSeed
-		local n = waveNoiseCached(t, seed)
-		sizeMultiplier *= math.max(0, 1 + self.sizeNoiseAmplitude * n)
-	end
-
-	sizeMultiplier = math.max(sizeMultiplier, 0.01)
-
 	state._tickSize += 1
 	if (state._tickSize % self.sizeUpdateStep) == 0 then
-		state.part.Size = state.baseSize * sizeMultiplier
+		state.part.Size = state.baseSize * evaluateSizeMultiplier(self, progress, state.age, state.prngSeed)
 	end
 
 
@@ -2700,7 +2693,7 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 24,
+		Version = 25,
 		AuthoringPreview = authoringPreview,
 		SimulationPaused = simulationPaused,
 		Frame = _frameSerial,

@@ -2,15 +2,21 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v24
+## Download v25
 
-[Download `VoxelParticlesPlugin-v24.rbxmx`](dist/VoxelParticlesPlugin-v24.rbxmx)
+[Download `VoxelParticlesPlugin-v25.rbxmx`](dist/VoxelParticlesPlugin-v25.rbxmx)
 
-SHA-256: `66bfd5b634763743cb87129008d624b9c3eecf8abc16ac07b214bd359b4ddbeb`
+SHA-256: `d151a68a2c8fb777a84007ceb310bd44a1fd352812381c8d4473720ab572c3c1`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v24**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v25**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **24**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **25**. The builder rejects mixed release numbers.
+
+## Size curves at birth in v25
+
+New particles apply the size curve's start value and size noise before becoming visible. Previously they appeared at the unscaled base size until the first scheduled size write; with `sizeUpdateStep=3`, the wrong size persisted through the first two simulation steps. Birth and subsequent updates now share the same calculation. The existing minimum multiplier of `0.01`, authored update cadence and base size remain unchanged.
+
+The fix applies to the bundled editor preview and the shipped gameplay runtime. Updating a local plugin does not replace a project's custom or disk-synced runtime; those owners need the corresponding source change. Preserve unsaved preset edits with **Export source** before reloading the plugin.
 
 ## Full-density Studio preview in v24
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## v25 — 2026-09-18
+
+- Fixed oversized particle births: the initial size now includes the lifetime curve and seeded size noise before the Part becomes visible. Previously spawn used the raw base size until the first `sizeUpdateStep` write.
+- Shared the size calculation between birth and updates. Preserved authored update intervals, base size, curve interpolation and the existing minimum multiplier of 0.01; skipped writes no longer calculate unused size noise.
+- Plugin, runtime and installer share version 25. Exact v24 runtime remains eligible for updates; customized and synced sources remain protected. Package membership is unchanged: one entry, nine internal modules, 32 presets.
+
+Release artifact: `dist/VoxelParticlesPlugin-v25.rbxmx`
+
+SHA-256: `d151a68a2c8fb777a84007ceb310bd44a1fd352812381c8d4473720ab572c3c1`
+
+Validation: reproduced the wrong birth size with one in-memory particle, then passed zero/small/default start values, skipped writes, curve progression at 30/60 simulation steps per second, and noise continuity. Scoped Luau analysis, manifest/XML/source checks and the existing installer scenarios including v24 updates passed. No Studio particle execution, Play, performance measurement, installation, reload or publication was performed; the operator's unsaved preset remains untouched.
+
 ## v24 — 2026-09-18
 
 - Gameplay distance fading now starts no earlier than 70 studs and preserves the authored fade width. Continuous emission and bursts share this rule; quality, global budgets, local limits and viewport culling still apply.
