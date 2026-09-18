@@ -1,5 +1,9 @@
 # LESSONS
 
+- 2026-09-18: authoring preview belongs to the bundled runtime, independently of the project's installation status. Custom or synced runtime source must not disable selection, preset editing, or preview; disk-owned presets can be exported without writing their Studio source. Installation status still describes the project, not preview readiness.
+- 2026-09-18: plugin ownership metadata alone does not authorize replacing edited source. Updates require current bundle content, an exact released fingerprint, or the unchanged fingerprint recorded at installation. Preserve customized runtime and authored presets.
+- 2026-09-18: Minimum quality remains at 15%, never zero. Preserve positive fractional rates and small bursts; visible emitters share particle/frame quotas without a quality-dependent emitter cutoff. No emergency all-off policy is implemented.
+
 - `PLUGIN_EXPORT_CORE/VoxelParticlesPlugin` is the only editable plugin package source. Historical top-level game scripts, `Shared`, `StarterPlayerScripts`, media, and donation files are not plugin owners and are excluded from the public repository.
 - The installed `%LOCALAPPDATA%\Roblox\Plugins\VoxelParticlesPlugin.rbxmx` is a release/template input, never the source of truth and never an in-place build target.
 - Every packaged source is declared in `plugin-package.json`; `plugin-sourcemap.json` and the `.rbxmx` hierarchy must match it exactly.

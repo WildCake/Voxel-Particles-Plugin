@@ -43,12 +43,14 @@ local bindPresetFolder
 local presetsFolder = nil
 
 local Internal = script:WaitForChild("Internal")
+local BundledPresets = Internal:WaitForChild("BundledPresets")
+local sourceExport = require(Internal:WaitForChild("PresetSourceExport")).Create(plugin)
 local VoxelCubicBezier = require(Internal:WaitForChild("VoxelCubicBezier"))
 local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 22
+local PLUGIN_VERSION = 23
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -574,7 +576,7 @@ local function updatePlaybackButton()
 	if not playbackButton then
 		return
 	end
-	playbackButton.Text = previewPlaying and "Stop" or "Play"
+	playbackButton.Text = previewPlaying and "Stop preview" or "Preview"
 	if playbackButton.Active then
 		playbackButton.BackgroundColor3 = previewPlaying and STOP_COLOR or SAVE_COLOR
 	else
@@ -796,7 +798,7 @@ local function applyRuntimeInspection(status)
 	currentRuntimeStatus = status
 	runtimePrepared = status.ready == true
 	presetsFolder = status.presetsFolder
-	local roleText = "Source template (inert ModuleScript): Plugin/Internal/VoxelEmitterBinderTemplate\nInstalled runtime (enabled LocalScript): StarterPlayerScripts/VoxelEmitterBinder"
+	local roleText = "Preview uses the plugin's bundled runtime.\nPlay uses your project's StarterPlayerScripts.VoxelEmitterBinder."
 	if #status.duplicatePaths > 0 then
 		roleText ..= "\nDuplicates: " .. table.concat(status.duplicatePaths, ", ")
 	elseif status.blocked and #status.conflicts > 0 then
@@ -815,7 +817,9 @@ local function applyRuntimeInspection(status)
 		initializeProjectBtn.BackgroundColor3 = Color3.fromRGB(90, 140, 255)
 	end
 	if bindPresetFolder then
-		bindPresetFolder(presetsFolder)
+		-- Bundled presets are an explicit read-only authoring library until the
+		-- project has its own preset folder. Preview never requires its runtime.
+		bindPresetFolder(presetsFolder or BundledPresets)
 	end
 	return runtimePrepared
 end
@@ -867,10 +871,6 @@ initializeProjectBtn.MouseButton1Click:Connect(function()
 end)
 
 createEmitterBtn.MouseButton1Click:Connect(function()
-	if not runtimePrepared then
-		statusLabel.Text = "Initialize or update the project runtime first."
-		return
-	end
 	createEmitterAtCenter()
 end)
 
@@ -2094,17 +2094,6 @@ local function updateStatus()
 	if refreshRunModeControls then
 		refreshRunModeControls(playMode)
 	end
-	if not runtimePrepared then
-		local runtimeMessage = currentRuntimeStatus and currentRuntimeStatus.message
-		statusLabel.Text = runtimeMessage or "Inspecting Voxel Particles runtime..."
-		if scroll then
-			scroll.Visible = false
-			scroll.Active = false
-		end
-		setWidgetTitleDirty()
-		return
-	end
-
 	if not currentEmitter then
 		statusLabel.Text = playMode
 			and "Play mode: select an emitter in Workspace. Editor controls are disabled."
@@ -2115,7 +2104,17 @@ local function updateStatus()
 		end
 	else
 		local parts = {}
+		if not selectedPresetItem then
+			statusLabel.Text = "Preset missing or invalid: " .. tostring(currentEmitter:GetAttribute(PRESET_ATTRIBUTE))
+				.. ". Select a valid preset; details are in Output."
+			if scroll then scroll.Visible = false; scroll.Active = false end
+			setWidgetTitleDirty()
+			return
+		end
 		table.insert(parts, stateDirty and "Unsaved changes" or "All changes saved")
+		if not currentState.enabled then table.insert(parts, "Emission disabled in this preset")
+		elseif currentState.rate <= 0 then table.insert(parts, "Burst preset: use the Burst control") end
+		if not runtimePrepared then table.insert(parts, "Bundled preview; project runtime needs attention") end
 		if selectedPresetItem and selectedPresetItem.module then
 			table.insert(parts, string.format("Preset: %s", selectedPresetItem.module.Name))
 			if RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
@@ -2149,7 +2148,7 @@ local function _scheduleAutoSave()
 	if isPlayMode() then return end
 	if not currentEmitter then return end
 	if not selectedPresetItem or not selectedPresetItem.module then return end
-	if RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
+	if selectedPresetItem.module:IsDescendantOf(BundledPresets) or RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
 		updateStatus()
 		return
 	end
@@ -2710,9 +2709,7 @@ local function parsePresetModule(module)
 	end
 
 	local state = defaultState()
-	if typeof(data.state) == "table" then
-		mergeInto(state, data.state)
-	end
+	mergeInto(state, data.state or data)
 	if data.seed ~= nil then state.seed = data.seed end
 	if data.enabled ~= nil then state.enabled = data.enabled and true or false end
 	ensureStateIntegrity(state)
@@ -2823,7 +2820,11 @@ end
 
 
 local function refreshPresetModule(module)
-	local item = parsePresetModule(module)
+	local ok, item = pcall(parsePresetModule, module)
+	if not ok then
+		warn("[VoxelParticlesPlugin] Invalid preset", module:GetFullName(), item)
+		item = nil
+	end
 	if item then
 		presetItems[module] = item
 	else
@@ -2831,6 +2832,7 @@ local function refreshPresetModule(module)
 	end
 	if selectedPresetItem and selectedPresetItem.module == module then
 		setSelectedPreset(presetItems[module])
+		if not item then destroyPreview() end
 	end
 	rebuildPresetDropdown()
 	return presetItems[module]
@@ -2981,28 +2983,10 @@ local function buildModuleSource(moduleName, displayName, state)
 end
 
 
--- VoxelParticlesPlugin.lua
-local function ensureDefaultPreset()
-	if not runtimePrepared or not presetsFolder then
-		error("Voxel Particles runtime is not initialized")
-	end
-	local mod = presetsFolder:FindFirstChild(DEFAULT_PRESET_NAME)
-	if not mod then
-		error("Bundled Default preset is missing; use Update project")
-	end
-	if not mod:IsA("ModuleScript") then
-		error(("Default preset must be a ModuleScript, got %s"):format(mod.ClassName))
-	end
-	return mod
-end
-
 
 
 
 local function setCurrentEmitter(emitter)
-	if not runtimePrepared then
-		emitter = nil
-	end
 	if emitter == currentEmitter then
 		updateEmitterInfo()
 		return
@@ -3042,7 +3026,7 @@ local function setCurrentEmitter(emitter)
 	local applied = false
 	if typeof(attrPreset) == "string" and attrPreset ~= "" then
 		presetNameBox.Text = attrPreset
-		local module = presetsFolder:FindFirstChild(attrPreset)
+		local module = (presetsFolder or BundledPresets):FindFirstChild(attrPreset)
 		if module and module:IsA("ModuleScript") then
 			local item = presetItems[module] or refreshPresetModule(module)
 			if item then
@@ -3054,18 +3038,13 @@ local function setCurrentEmitter(emitter)
 	end
 
 	if not applied then
-		-- Preview Default without mutating selection merely because it was inspected.
-		local defMod = ensureDefaultPreset()
-		local defItem = presetItems[defMod] or refreshPresetModule(defMod)
-		setSelectedPreset(defItem)
-		presetNameBox.Text = defMod.Name
-
-		-- дефолтное состояние даже если defItem вдруг ещё не распарсился
-		currentState = deepCopy(defItem and defItem.state or defaultState())
+		-- Keep a broken reference visible; never disguise it with another effect.
+		setSelectedPreset(nil)
+		currentState = defaultState()
 		ensureStateIntegrity(currentState)
 		rebuildPanel(currentState)
 		stateDirty = false
-		applyPreview()
+		destroyPreview()
 	end
 
 
@@ -3196,8 +3175,8 @@ saveCurrentPreset = function()
 		statusLabel.Text = "Play mode: presets are read-only."
 		return
 	end
-	if not runtimePrepared or not presetsFolder then
-		statusLabel.Text = "Initialize or update the project runtime first."
+	if not presetsFolder then
+		statusLabel.Text = "Install project presets before saving, or export the source."
 		return
 	end
 
@@ -3210,7 +3189,8 @@ saveCurrentPreset = function()
 		statusLabel.Text = "Select or create a preset before saving."
 		return
 	end
-	if RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
+	if selectedPresetItem.module:IsDescendantOf(BundledPresets)
+		or RuntimeInstaller.isFileSynced(presetsFolder) or RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
 		statusLabel.Text = "Preview only: native Script Sync owns this preset. Save through its disk file."
 		return
 	end
@@ -3303,11 +3283,6 @@ createEmitterAtCenter = function()
 		statusLabel.Text = "Play mode: emitters cannot be created."
 		return
 	end
-	if not runtimePrepared then
-		statusLabel.Text = "Initialize or update the project runtime first."
-		return
-	end
-
 	local ok, partOrError = pcall(function()
 		return recordChange("VoxelParticles.CreateEmitter", "Create Voxel Emitter", function()
 			local part = Instance.new("Part")
@@ -3361,7 +3336,7 @@ applyPreview = function()
 	end
 
 	-- Без валидного эмиттера превью не нужно
-	if not currentEmitter or not currentEmitter.Parent then
+	if not currentEmitter or not currentEmitter.Parent or not selectedPresetItem then
 		destroyPreview()
 		return
 	end
@@ -3526,8 +3501,8 @@ local newPresetBtn = createButton(actionsRow, "New preset", function()
 		statusLabel.Text = "Play mode: presets are read-only."
 		return
 	end
-	if not runtimePrepared or not presetsFolder then
-		statusLabel.Text = "Initialize or update the project runtime first."
+	if not presetsFolder then
+		statusLabel.Text = "Install project presets before creating a saved preset."
 		return
 	end
 	if RuntimeInstaller.isFileSynced(presetsFolder) then
@@ -3586,13 +3561,31 @@ end)
 
 newPresetBtn.Parent = actionsRow
 
+createButton(actionsRow, "Export source", function()
+	if not currentEmitter or not selectedPresetItem then
+		statusLabel.Text = "Select an emitter and a valid preset to export."
+		return
+	end
+	local name = selectedPresetItem.module.Name
+	local ok, source = pcall(buildModuleSource, name, currentDisplayName, currentState)
+	if ok then sourceExport.Show(name, source)
+	else statusLabel.Text = "Export failed: " .. tostring(source) end
+end)
+
+for _, button in ipairs(actionsRow:GetChildren()) do
+	if button:IsA("TextButton") then
+		button.Size = UDim2.new(1 / 3, -6, 1, 0)
+		button.TextSize = 12
+	end
+end
+
 local textBoxBaseColor = displayNameBox.BackgroundColor3
 local presetDropdownBaseColor = presetDropdown.BackgroundColor3
 local createEmitterBaseColor = createEmitterBtn.BackgroundColor3
 local newPresetBaseColor = newPresetBtn.BackgroundColor3
 
 refreshRunModeControls = function(playMode)
-	local editable = not playMode and runtimePrepared
+	local editable = not playMode
 	local presetFolderWritable = editable and presetsFolder ~= nil and not RuntimeInstaller.isFileSynced(presetsFolder)
 	local selectedModule = selectedPresetItem and selectedPresetItem.module
 	local presetSourceWritable = presetFolderWritable
@@ -3610,7 +3603,7 @@ refreshRunModeControls = function(playMode)
 
 	setButtonEnabled(presetDropdown, presetDropdownBaseColor, editable)
 	setButtonEnabled(createEmitterBtn, createEmitterBaseColor, editable)
-	newPresetBtn.Text = presetFolderWritable and "New preset" or "Disk-owned"
+	newPresetBtn.Text = "New preset"
 	setButtonEnabled(newPresetBtn, newPresetBaseColor, presetFolderWritable)
 	setButtonEnabled(playbackButton, previewPlaying and STOP_COLOR or SAVE_COLOR, editable)
 	if burstButton then setButtonEnabled(burstButton, Color3.fromRGB(90, 140, 255), editable) end
@@ -3666,6 +3659,7 @@ widget:GetPropertyChangedSignal("Enabled"):Connect(function()
 		destroyPreview()
 	else
 		if isEditMode() then
+			refreshRuntimeInspection()
 			applyPreview()
 		end
 	end
@@ -3716,9 +3710,12 @@ bindPresetFolder = function(folder)
 		end
 	end))
 
-	local defaultModule = folder:FindFirstChild(DEFAULT_PRESET_NAME)
-	if defaultModule and defaultModule:IsA("ModuleScript") then
-		setSelectedPreset(presetItems[defaultModule] or refreshPresetModule(defaultModule))
+	if currentEmitter then
+		local name = currentEmitter:GetAttribute(PRESET_ATTRIBUTE)
+		local module = typeof(name) == "string" and folder:FindFirstChild(name)
+		local item = module and presetItems[module]
+		setSelectedPreset(item)
+		if item then applyPresetItem(item, true) else destroyPreview() end
 	end
 end
 
@@ -3762,6 +3759,7 @@ local heartbeatConnection = RunService.Heartbeat:Connect(function()
 	refreshPlayModeState(false)
 end)
 
+bindPresetFolder(BundledPresets)
 refreshRuntimeInspection()
 refreshPlayModeState(true)
 setCurrentEmitter(resolveSelectionEmitter())
@@ -3769,6 +3767,7 @@ updateStatus()
 updatePlaybackButton()
 
 plugin.Unloading:Connect(function()
+	sourceExport.Destroy()
 	stopBurstLoop()
 	destroyPreview()
 	clearEmitterConnections()

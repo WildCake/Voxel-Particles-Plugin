@@ -27,6 +27,7 @@
 !/dist/VoxelParticlesPlugin-v20.rbxmx
 !/dist/VoxelParticlesPlugin-v21.rbxmx
 !/dist/VoxelParticlesPlugin-v22.rbxmx
+!/dist/VoxelParticlesPlugin-v23.rbxmx
 
 __pycache__/
 *.py[cod]

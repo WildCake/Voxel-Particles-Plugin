@@ -1,8 +1,8 @@
 {
   "pluginName": "VoxelParticlesPlugin",
-  "pluginVersion": 22,
-  "runtimeVersion": 22,
-  "installerVersion": 22,
+  "pluginVersion": 23,
+  "runtimeVersion": 23,
+  "installerVersion": 23,
   "sourceRoot": "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin",
   "entrySource": "init.legacy.luau",
   "internalModules": [
@@ -13,7 +13,8 @@
     "VoxelMotionIntegrator",
     "VoxelCubicBezier",
     "VoxelCylinderStream",
-    "RuntimeInstaller"
+    "RuntimeInstaller",
+    "PresetSourceExport"
   ],
   "bundledPresets": [
     "AnnulusOrbit",

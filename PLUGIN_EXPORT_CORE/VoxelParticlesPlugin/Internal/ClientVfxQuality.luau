@@ -21,6 +21,7 @@ local userGameSettings: any = nil
 local manualCap = ClientVfxQuality.Tier.Medium
 local effectiveTier = ClientVfxQuality.Tier.Medium
 local automatic = true
+local applicationCap: number? = nil
 local studioForcedTier: number? = nil
 local rollingFrameTime = 1 / 60
 local emergencySeconds = 0
@@ -85,13 +86,16 @@ local function refreshManualCap()
 		end
 	end
 	local nextCap, isAutomatic = tierForSavedQuality(savedQuality)
-	manualCap = nextCap
+	local previousCap = manualCap
+	manualCap = math.min(nextCap, applicationCap or ClientVfxQuality.Tier.High)
 	automatic = isAutomatic
 	if studioForcedTier ~= nil then
 		manualCap = ClientVfxQuality.Tier.High
 	end
 	if effectiveTier > manualCap then
 		setEffectiveTier(manualCap, "RobloxQualityCap")
+	elseif effectiveTier == previousCap and manualCap > previousCap then
+		setEffectiveTier(manualCap, "QualityCapRaised")
 	elseif effectiveTier < ClientVfxQuality.Tier.Minimum then
 		setEffectiveTier(ClientVfxQuality.Tier.Minimum, "RobloxQualityCap")
 	end
@@ -138,7 +142,7 @@ end
 
 function ClientVfxQuality.GetParticleMultiplier(): number
 	if effectiveTier <= ClientVfxQuality.Tier.Minimum then
-		return 0
+		return 0.15
 	elseif effectiveTier == ClientVfxQuality.Tier.Low then
 		return 0.3
 	elseif effectiveTier == ClientVfxQuality.Tier.Medium then
@@ -149,6 +153,16 @@ end
 
 function ClientVfxQuality.OnTierChanged(callback: (number, string) -> ()): RBXScriptConnection
 	return tierChanged.Event:Connect(callback)
+end
+
+-- Optional application preference; this module never loads a game's settings UI.
+-- One settings owner supplies the ceiling and clears it with nil on teardown.
+function ClientVfxQuality.SetQualityCap(tier: number?)
+	assert(tier == nil or (tier % 1 == 0 and tier >= ClientVfxQuality.Tier.Minimum
+		and tier <= ClientVfxQuality.Tier.High), "Quality cap must be nil or a Tier value")
+	if applicationCap == tier then return end
+	applicationCap = tier
+	refreshManualCap()
 end
 
 function ClientVfxQuality.SetStudioForcedTier(tier: number?)
@@ -167,6 +181,7 @@ function ClientVfxQuality.GetDiagnostics(): {[string]: any}
 	return {
 		Tier = effectiveTier,
 		ManualCap = manualCap,
+		ApplicationCap = applicationCap,
 		Automatic = automatic,
 		RollingFrameTimeMs = rollingFrameTime * 1000,
 		Reason = lastReason,
@@ -176,7 +191,7 @@ end
 
 refreshManualCap()
 if automatic and studioForcedTier == nil then
-	effectiveTier = ClientVfxQuality.Tier.Medium
+	effectiveTier = math.min(manualCap, ClientVfxQuality.Tier.Medium)
 else
 	effectiveTier = math.min(manualCap, studioForcedTier or manualCap)
 end

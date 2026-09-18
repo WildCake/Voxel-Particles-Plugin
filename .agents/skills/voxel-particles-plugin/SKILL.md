@@ -33,7 +33,7 @@ Native Script Sync owns mapped project source. RuntimeInstaller may inspect it b
 ## Runtime invariants
 
 - `ClientVfxQuality` is client-only and owns the saved-quality cap, frame-pressure tier, diagnostics, and tier-change event.
-- Minimum quality may stop continuous emission without reclassifying that emitter as a burst emitter.
+- Minimum quality retains positive emission density (15%); ordinary saved-quality settings and frame-pressure tiers must not switch effects off. Positive rates retain fractional credit and positive bursts request at least one particle. Explicit disabled/burst settings, camera culling, and shared hard budgets keep their meaning. Full emergency shutdown requires a separately designed severe-FPS policy; v23 does not introduce one.
 - Annulus sampling stays uniform by area and accepts only equal positive X/Z outer radii with `0 <= inner < outer`.
 - Radial direction modes use the actual sampled offset. A zero offset retains emission-axis behavior.
 - Invalid editor state is rejected before configuring a live preview emitter.

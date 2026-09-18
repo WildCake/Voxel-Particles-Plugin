@@ -98,10 +98,12 @@ local VPS           = require(Shared:WaitForChild("VoxelParticleSystem"))
 -- ==== Состояние биндера =======================================================
 type BindingRecord = {
 	Emitter: any?,
+	Revision: number,
 	Connections: {RBXScriptConnection},
 }
 
-local bindings: {[BasePart]: BindingRecord} = setmetatable({}, { __mode = "k" })
+local bindings = setmetatable({} :: {[BasePart]: BindingRecord}, { __mode = "k" })
+local shuttingDown = false
 
 -- ==== Утилиты =================================================================
 local function deepCopy(v)
@@ -118,13 +120,25 @@ end
 local function loadPresetState(name: string): any?
 	if typeof(name) ~= "string" or name == "" then return nil end
 	local mod = PresetsFolder:FindFirstChild(name)
-	if not (mod and mod:IsA("ModuleScript")) then return nil end
-	local ok, data = pcall(function() return require(mod) end)
-	if not ok then return nil end
-
-	local src = (typeof(data) == "table" and (data.state or data)) or data
-	if typeof(src) ~= "table" then return nil end
-	return deepCopy(src)
+	if not (mod and mod:IsA("ModuleScript")) then
+		warn(("[VoxelParticles] Missing preset ModuleScript: %s.%s"):format(PresetsFolder:GetFullName(), name))
+		return nil
+	end
+	local ok, result = pcall(function()
+		local data = require(mod)
+		if typeof(data) == "function" then data = data() end
+		assert(typeof(data) == "table", "Preset must return a table or a factory returning a table")
+		local state = deepCopy(data.state or data)
+		assert(typeof(state) == "table", "Preset state must be a table")
+		if data.enabled ~= nil then state.enabled = data.enabled end
+		if data.seed ~= nil then state.seed = data.seed end
+		return state
+	end)
+	if not ok then
+		warn(("[VoxelParticles] Preset failed: %s — %s"):format(mod:GetFullName(), tostring(result)))
+		return nil
+	end
+	return result
 end
 
 local function destroyEmitter(record: BindingRecord)
@@ -143,6 +157,8 @@ local function bind(part: BasePart)
 		return
 	end
 
+	record.Revision += 1
+	local revision = record.Revision
 	destroyEmitter(record)
 	if not CollectionService:HasTag(part, TAG) or not part:IsDescendantOf(Workspace) then
 		return
@@ -150,6 +166,7 @@ local function bind(part: BasePart)
 
 	local presetName = part:GetAttribute(PRESET_ATTRIBUTE)
 	if typeof(presetName) ~= "string" or presetName == "" then
+		warn(("[VoxelParticles] Emitter has no VoxelPreset: %s"):format(part:GetFullName()))
 		return
 	end
 
@@ -157,13 +174,21 @@ local function bind(part: BasePart)
 	if not cfg then
 		return
 	end
+	-- require/factory can yield; only the still-current selection owns this result.
+	if bindings[part] ~= record or record.Revision ~= revision
+		or not part:IsDescendantOf(Workspace) or not CollectionService:HasTag(part, TAG) then return end
 
 	local burstOnEnable = (part:GetAttribute(BURST_ON_ENABLE_ATTRIBUTE) == true)
 	if burstOnEnable then
 		cfg.burstOnEnable = true
 	end
 
-	local emitter = VPS.Attach(part, cfg)
+	local attached, emitter = pcall(VPS.Attach, part, cfg)
+	if not attached then
+		warn(("[VoxelParticles] Emitter failed: %s; preset=%s — %s")
+			:format(part:GetFullName(), presetName, tostring(emitter)))
+		return
+	end
 	record.Emitter = emitter
 
 	-- Первичный BURST, если атрибут уже выставлен
@@ -197,24 +222,20 @@ local function unwatch(part: BasePart)
 end
 
 local function watch(part: BasePart)
-	if bindings[part] ~= nil then
+	if shuttingDown or bindings[part] ~= nil then
 		return
 	end
 
 	local record: BindingRecord = {
 		Emitter = nil,
+		Revision = 0,
 		Connections = {},
 	}
 	bindings[part] = record
 
 	-- Смена пресета → ребинд
 	record.Connections[#record.Connections + 1] = part:GetAttributeChangedSignal(PRESET_ATTRIBUTE):Connect(function()
-		local name = part:GetAttribute(PRESET_ATTRIBUTE)
-		if typeof(name) == "string" and #name > 0 then
-			bind(part)
-		else
-			destroyEmitter(record)
-		end
+		bind(part)
 	end)
 
 	-- Сигнал бёрста: просто вызываем Emit у уже привязанного эмиттера
@@ -258,13 +279,6 @@ local function watch(part: BasePart)
 	bind(part)
 end
 
--- ==== Инициализация по уже существующим тегам ================================
-for _, inst in ipairs(CollectionService:GetTagged(TAG)) do
-	if inst:IsA("BasePart") then
-		watch(inst)
-	end
-end
-
 local tagAddedConnection = CollectionService:GetInstanceAddedSignal(TAG):Connect(function(inst)
 	if inst:IsA("BasePart") then
 		watch(inst)
@@ -277,7 +291,6 @@ local tagRemovedConnection = CollectionService:GetInstanceRemovedSignal(TAG):Con
 	end
 end)
 
-local shuttingDown = false
 script.Destroying:Connect(function()
 	if shuttingDown then
 		return
@@ -298,3 +311,8 @@ script.Destroying:Connect(function()
 		binderClaim:Destroy()
 	end
 end)
+
+-- Subscribe and own cleanup before a custom preset can yield during enumeration.
+for _, inst in ipairs(CollectionService:GetTagged(TAG)) do
+	if inst:IsA("BasePart") then watch(inst) end
+end

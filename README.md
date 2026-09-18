@@ -2,15 +2,27 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v22
+## Download v23
 
-[Download `VoxelParticlesPlugin-v22.rbxmx`](dist/VoxelParticlesPlugin-v22.rbxmx)
+[Download `VoxelParticlesPlugin-v23.rbxmx`](dist/VoxelParticlesPlugin-v23.rbxmx)
 
-SHA-256: `4165ed5b587bb8bf7ead73de909e23a25645e7f85ac0658173fe54aa464ae300`
+SHA-256: `84683be4e15345da5259d1b25a7591d45f40e315ea910b1ecc30a7b506a6c6a1`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v22**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v23**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **22**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **23**. The builder rejects mixed release numbers.
+
+## Authoring and custom projects in v23
+
+The editor previews with its bundled runtime. Creating/selecting emitters and editing/previewing valid presets remain available when a project has a customized or outdated runtime. Installation warnings describe **Play in your project**, independently of preview. Before initializing a project, the editor offers the bundled presets as a read-only authoring library.
+
+The updater preserves native Script Sync source and user-modified runtime, including modules originally installed by this plugin. It updates only exact released source or source that still matches its recorded installation fingerprint. Existing authored presets remain unchanged. A custom project is not reported as matching the release; review your integration on disk instead of overwriting it through the plugin.
+
+**Export source** opens selectable Luau text for the current preset settings. Copy it to the appropriate disk-owned preset; export never overwrites Studio source or marks edits as saved. A missing or invalid preset is identified explicitly. One failing preset does not stop the runtime binder from attaching other emitters. Both preview and binder accept a config table, `{ state = config }`, or a factory returning either form.
+
+Minimum quality keeps **15% density**. Positive rates retain fractional emission credit, and positive bursts request at least one particle. Visible emitters share the existing particle/frame quotas without a quality-dependent emitter-count cutoff. Explicit `enabled=false`, burst-only `rate=0`, camera culling and exhausted shared budgets still apply; no automatic complete shutdown is introduced.
+
+Games can supply an optional ceiling through `ClientVfxQuality.SetQualityCap(ClientVfxQuality.Tier.Low)`. Use one settings owner and call `SetQualityCap(nil)` when releasing that preference. The shared module has no dependency on any game's settings UI. Roblox saved quality and frame pressure continue to constrain the effective tier.
 
 ## Stopping emission in v22
 
@@ -21,7 +33,7 @@ Call `emitter:StopEmission()` when an effect ends naturally. It disables continu
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v22 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v23 is ready**.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.
@@ -100,14 +112,14 @@ Place anchors at the same position and assign their `VoxelPreset` attributes to 
 - Local-space effects resume from their current anchor transform after warmup or culling.
 - Studio no longer forces Medium quality. Use `ClientVfxQuality.SetStudioForcedTier()` only for explicit Studio tests.
 
-Default shared limits per client:
+Current default shared limits per client (v23):
 
-| Quality | Simulated emitters | Living particles | New particles per frame |
+| Quality | Emission multiplier | Living particles | New particles per frame |
 | --- | ---: | ---: | ---: |
-| High | 15 | 512 | 128 |
-| Medium | 10 | 333 | 83 |
-| Low | 5 | 154 | 38 |
-| Minimum | 0 | 0 | 0 |
+| High | 100% | 512 | 128 |
+| Medium | 65% | 333 | 83 |
+| Low | 30% | 154 | 38 |
+| Minimum | 15% | 77 | 19 |
 
 These are upper bounds across the system, not per-preset allowances. The reusable reserve contains 512 Parts; dormant Parts are unparented. Prewarming takes 64 rendered frames (about 1.07 seconds at 60 FPS). Calling `SetMaxTotalParticles()` changes the single system capacity; individual demo scripts should not compete to configure it.
 
@@ -120,7 +132,7 @@ These are upper bounds across the system, not per-preset allowances. The reusabl
 - Cubic Bézier emitters add the curve-only `curveNormal` velocity mode.
 - `spawnShape = "annulus"` samples a circular ring area uniformly through `spawnInnerRadius`.
 - The editor exposes and validates the new fields before changing a live preview emitter.
-- Minimum quality stops both continuous and burst voxel emission without reclassifying an emitter.
+- Minimum quality reduces density while preserving positive continuous and burst requests.
 - Clean installations now include the required bundled `Default` preset.
 
 The older v11 quality path lived inside `VoxelParticleSystem`, observed only the selected Roblox graphics setting, and scaled only each voxel emitter's rate. v12 moves the decision into a reusable shared owner with frame-pressure adaptation, diagnostics, and tier-change notifications for other client VFX consumers.

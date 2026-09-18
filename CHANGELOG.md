@@ -1,5 +1,20 @@
 # Changelog
 
+## v23 — 2026-09-18
+
+- Separated editor authoring/preview from project runtime installation. Customized and synced runtime no longer disables the editor. Added source export for disk-owned presets and an explicit read-only bundled preset library before installation.
+- Preserved user modifications even when a runtime still carries plugin ownership metadata. Updates check released source or the unchanged installation fingerprint. Exact v12–v22 bundles remain updatable.
+- Kept Minimum density at 15%, positive fractional rates and small bursts. Removed the quality-dependent visible-emitter cutoff; particle/frame quotas and camera culling remain.
+- Added the game-independent `ClientVfxQuality.SetQualityCap` API. No game-specific settings or dependencies are bundled.
+- Aligned preset factory/raw-table handling between editor and binder. Invalid presets produce named diagnostics without preventing other emitters from binding; yielding loads cannot attach a superseded selection.
+- Plugin, runtime and installer share version 23. Package: one entry, nine internal modules and 32 presets.
+
+Release artifact: `dist/VoxelParticlesPlugin-v23.rbxmx`
+
+SHA-256: `84683be4e15345da5259d1b25a7591d45f40e315ea910b1ecc30a7b506a6c6a1`
+
+Validation: manifest/XML/source checks, compilation of all 42 sources, scoped Luau analysis and in-memory installer checks for clean install, v12–v22 updates, edited/synced source protection and duplicates. Particle execution, Studio preview, Play, performance measurements, installation and publication were not performed. The reported third-party incident cannot be reproduced from a screenshot alone; the fixes address independently confirmed code paths.
+
 ## v22 — 2026-09-09
 
 - Added explicit emission retirement through [StopEmission](README.md#stopping-emission-in-v22). Existing particle motion, presets, SetEnabled, Emit and simulation pause semantics are unchanged.

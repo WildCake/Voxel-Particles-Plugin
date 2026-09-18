@@ -21,15 +21,36 @@ local BundledSharedRuntime = {
 }
 local BundledPresets = Internal:WaitForChild("BundledPresets")
 
-local RUNTIME_VERSION = 22
-local INSTALLER_VERSION = 22
+local RUNTIME_VERSION = 23
+local INSTALLER_VERSION = 23
 local MANAGED_ATTRIBUTE = "VoxelParticlesPluginManaged"
 local VERSION_ATTRIBUTE = "VoxelParticlesRuntimeVersion"
 local INSTALLER_ATTRIBUTE = "VoxelParticlesInstallerVersion"
 local ROLE_ATTRIBUTE = "VoxelParticlesRuntimeRole"
+local SOURCE_ATTRIBUTE = "VoxelParticlesInstalledSource"
 local LEGACY_FINGERPRINTS = {
-	VoxelParticleSystem = { length = 84642, djb2 = 2280397555, sdbm = 4125035962 },
-	VoxelEmitterBinder = { length = 5374, djb2 = 1141971026, sdbm = 2214730513 },
+	-- Exact shipped sources, not an authorization to overwrite modified code.
+	VoxelParticleSystem = {
+		{ length = 84642, djb2 = 2280397555, sdbm = 4125035962 },
+		{ length = 87476, djb2 = 2493384018, sdbm = 831262181 },
+		{ length = 89655, djb2 = 3180632211, sdbm = 1996503102 },
+		{ length = 93656, djb2 = 2545522935, sdbm = 2388797262 },
+		{ length = 90339, djb2 = 2058684976, sdbm = 396350825 },
+		{ length = 90983, djb2 = 1015315156, sdbm = 1233186419 },
+		{ length = 90983, djb2 = 3620527414, sdbm = 3086491443 },
+		{ length = 92039, djb2 = 880809626, sdbm = 1144007767 },
+		{ length = 93371, djb2 = 3438957004, sdbm = 3636166175 },
+		{ length = 93638, djb2 = 1104975223, sdbm = 481698440 },
+	},
+	VoxelEmitterBinder = {
+		{ length = 5374, djb2 = 1141971026, sdbm = 2214730513 },
+		{ length = 8708, djb2 = 3674064645, sdbm = 787960706 },
+		{ length = 8549, djb2 = 465114049, sdbm = 3486576528 },
+	},
+	ClientVfxQuality = {
+		{ length = 5758, djb2 = 1196490053, sdbm = 3285150070 },
+		{ length = 5694, djb2 = 886165004, sdbm = 3294622211 },
+	},
 }
 
 local function readScriptSource(instance)
@@ -96,7 +117,10 @@ local function isKnownLegacyRuntime(instance, name)
 		return false
 	end
 	local length, djb2, sdbm = sourceFingerprint(readScriptSource(instance))
-	return length == expected.length and djb2 == expected.djb2 and sdbm == expected.sdbm
+	for _, released in ipairs(expected) do
+		if length == released.length and djb2 == released.djb2 and sdbm == released.sdbm then return true end
+	end
+	return false
 end
 
 local function hasCurrentSource(instance, bundled)
@@ -108,9 +132,10 @@ local function isManaged(instance)
 end
 
 local function isSafePluginRuntime(instance, name, bundled)
-	return isManaged(instance)
-		or hasCurrentSource(instance, bundled)
-		or isKnownLegacyRuntime(instance, name)
+	if hasCurrentSource(instance, bundled) or isKnownLegacyRuntime(instance, name) then return true end
+	if not isManaged(instance) then return false end
+	local length, djb2, sdbm = sourceFingerprint(readScriptSource(instance))
+	return instance:GetAttribute(SOURCE_ATTRIBUTE) == ("%d:%d:%d"):format(length, djb2, sdbm)
 end
 
 local function markManaged(instance, role)
@@ -118,6 +143,10 @@ local function markManaged(instance, role)
 	instance:SetAttribute(VERSION_ATTRIBUTE, RUNTIME_VERSION)
 	instance:SetAttribute(INSTALLER_ATTRIBUTE, INSTALLER_VERSION)
 	instance:SetAttribute(ROLE_ATTRIBUTE, role)
+	if instance:IsA("LuaSourceContainer") then
+		local length, djb2, sdbm = sourceFingerprint(readScriptSource(instance))
+		instance:SetAttribute(SOURCE_ATTRIBUTE, ("%d:%d:%d"):format(length, djb2, sdbm))
+	end
 end
 
 local lastDuplicateWarningSignature = nil
@@ -221,7 +250,7 @@ local function analyzeTarget(status, key, parent, name, className, bundled, cand
 				table.insert(current, candidate)
 			end
 		else
-			addConflict(status, ("Unmanaged runtime source will not be overwritten: %s")
+			addConflict(status, ("Project-owned runtime preserved: %s. Editor preview remains available.")
 				:format(fullName(candidate)))
 		end
 	end

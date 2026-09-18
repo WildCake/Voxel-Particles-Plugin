@@ -80,6 +80,14 @@
               "children": []
             },
             {
+              "name": "PresetSourceExport",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/PresetSourceExport.luau"
+              ],
+              "children": []
+            },
+            {
               "name": "BundledPresets",
               "className": "Folder",
               "filePaths": [],

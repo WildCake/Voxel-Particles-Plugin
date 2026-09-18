@@ -1,6 +1,6 @@
 -- ReplicatedStorage/Shared/VoxelParticleSystem.lua
 -- Гибкая система воксельных (кубических) партиклов для клиентской отрисовки.
--- version 22
+-- version 23
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -153,8 +153,6 @@ end
 
 local _baseMaxTotalParticles = 512
 local MAX_TOTAL_PARTICLES = _baseMaxTotalParticles
-local MAX_ACTIVE_EMITTERS_HIGH = 15
-local maxActiveEmitters = MAX_ACTIVE_EMITTERS_HIGH
 local CAMERA_ADMISSION_INTERVAL = 1 / 15
 local cameraAdmissionElapsed = CAMERA_ADMISSION_INTERVAL
 
@@ -186,7 +184,7 @@ end
 
 local particles = {} :: {any}
 local emitters = {} :: {EmitterInstance}
-local selectedEmitters = table.create(MAX_ACTIVE_EMITTERS_HIGH) :: {EmitterInstance}
+local selectedEmitters = {} :: {EmitterInstance}
 local selectVisibleEmitters: () -> ()
 -- Глобальные «часы» для rate-noise (одни на все эмиттеры)
 local _rateNoiseClock = 0
@@ -444,16 +442,15 @@ end
 
 -- [REPLACE WHOLE FUNCTION] _applyQualityScaling
 local function _applyQualityScaling()
-	MAX_TOTAL_PARTICLES = math.max(0, math.floor(_baseMaxTotalParticles * _qualityMultiplier + 0.5))
-	maxActiveEmitters = math.floor(MAX_ACTIVE_EMITTERS_HIGH * _qualityMultiplier + 0.5)
+	MAX_TOTAL_PARTICLES = math.max(1, math.floor(_baseMaxTotalParticles * _qualityMultiplier + 0.5))
 	for _, emitter in ipairs(emitters) do
-		emitter.maxParticles = math.max(0, math.floor(emitter._baseMaxParticles * _qualityMultiplier + 0.5))
+		emitter.maxParticles = math.max(1, math.floor(emitter._baseMaxParticles * _qualityMultiplier + 0.5))
 		if emitter._baseRate == nil then
 			emitter._baseRate = math.max(0, tonumber(emitter.rate) or 0)
 		end
 		-- burst-эмиттеры (rate<=0) не трогаем
 		if emitter._baseRate > 0 then
-			local desired = math.max(0, math.floor(emitter._baseRate * _qualityMultiplier + 0.5))
+			local desired = emitter._baseRate * _qualityMultiplier
 			if desired ~= emitter.rate then
 				emitter.rate = desired
 			end
@@ -1074,13 +1071,13 @@ local function releaseParticle(state: ParticleState)
 	releaseCube(state.part)
 end
 
--- Re-rank the persistent emitter registry at 15 Hz. Distance and
--- viewport projection never raycast against scenery or billboard supports.
+-- All visible sources share the bounded particle/frame quotas.
+-- Quality changes density, not which visible emitter is allowed to exist.
 selectVisibleEmitters = function()
 	table.clear(selectedEmitters)
 	for _, emitter in emitters do
 		emitter._admitted = false
-		if maxActiveEmitters == 0 or emitter._destroyed
+		if emitter._destroyed
 			or not (emitter._enabled or emitter._alive > 0 or emitter._spawnDemand > 0) then
 			continue
 		end
@@ -1088,20 +1085,7 @@ selectVisibleEmitters = function()
 		emitter._cameraScale = cameraScale
 		emitter._cameraDistanceSquared = distanceSquared
 		if cameraScale <= 0 then continue end
-		local count = #selectedEmitters
-		if count == maxActiveEmitters
-			and distanceSquared >= selectedEmitters[count]._cameraDistanceSquared then
-			continue
-		end
-		local insertion = count + 1
-		while insertion > 1
-			and distanceSquared < selectedEmitters[insertion - 1]._cameraDistanceSquared do
-			insertion -= 1
-		end
-		table.insert(selectedEmitters, insertion, emitter)
-		if #selectedEmitters > maxActiveEmitters then
-			table.remove(selectedEmitters)
-		end
+		table.insert(selectedEmitters, emitter)
 	end
 	for _, emitter in selectedEmitters do
 		emitter._admitted = true
@@ -1116,15 +1100,17 @@ selectVisibleEmitters = function()
 			emitter._pendingSubsteps = 0
 		end
 	end
-	-- Reclaim before simulation: invisible emitters and quality reductions never
-	-- retain a second, unbudgeted population of living particles.
+	-- Reduce density before reclaiming the last particle of a visible source.
 	for index = #particles, 1, -1 do
 		local state = particles[index]
 		local emitter = state.emitter
 		if not emitter._admitted or emitter._alive > emitter.maxParticles
-			or liveCount > MAX_TOTAL_PARTICLES then
+			or (liveCount > MAX_TOTAL_PARTICLES and emitter._alive > 1) then
 			releaseParticle(state)
 		end
+	end
+	while liveCount > MAX_TOTAL_PARTICLES do
+		releaseParticle(particles[#particles])
 	end
 end
 
@@ -1500,7 +1486,7 @@ function Emitter:_applyConfig(config)
 
 	self._baseRate = math.max(0, tonumber(merged.rate) or 0)
 	if self._baseRate > 0 then
-		self.rate = math.max(0, math.floor(self._baseRate * _qualityMultiplier + 0.5))
+		self.rate = self._baseRate * _qualityMultiplier
 	else
 		self.rate = 0
 	end
@@ -1540,7 +1526,7 @@ function Emitter:_applyConfig(config)
 	end
 	local baseMaxParticles = math.max(1, math.floor(tonumber(merged.maxParticles) or DEFAULT_CONFIG.maxParticles))
 	self._baseMaxParticles = baseMaxParticles
-	self.maxParticles = math.max(0, math.floor(baseMaxParticles * _qualityMultiplier + 0.5))
+	self.maxParticles = math.max(1, math.floor(baseMaxParticles * _qualityMultiplier + 0.5))
 	local emissionDirection = merged.emissionDirection or DEFAULT_CONFIG.emissionDirection
 	if emissionDirection.Magnitude == 0 then
 		emissionDirection = Vector3.new(0, 1, 0)
@@ -2449,18 +2435,12 @@ function Emitter:Emit(count: number): number
 	if cameraScale <= 0 then
 		return 0
 	end
-	count = math.floor(count * cameraScale * _qualityMultiplier)
-	if count <= 0 then
-		return 0
-	end
+	count = math.max(1, math.floor(count * cameraScale * _qualityMultiplier))
 
 	-- Мягкий глобальный шейпер (как и для rate)
 	local budgetMul = _budgetMul()
 	if budgetMul < 1 then
-		count = math.max(0, math.floor(count * budgetMul))
-		if count == 0 then
-			return 0
-		end
+		count = math.max(1, math.floor(count * budgetMul))
 	end
 
 	-- Repeated bursts share the same bounded queue.
@@ -2661,13 +2641,12 @@ end
 
 function VoxelParticleSystem.GetDiagnostics(includeEmitters: boolean?)
 	local result: any = {
-		Version = 22,
+		Version = 23,
 		SimulationPaused = simulationPaused,
 		Frame = _frameSerial,
 		Ready = #pool + liveCount >= _baseMaxTotalParticles,
 		BaseCapacity = _baseMaxTotalParticles,
 		MaxTotalParticles = MAX_TOTAL_PARTICLES,
-		MaxActiveEmitters = maxActiveEmitters,
 		MaxSpawnsPerFrame = math.floor(128 * _qualityMultiplier),
 		FrameSpawnLimit = frameSpawnLimit,
 		QualityMultiplier = _qualityMultiplier,
