@@ -1,5 +1,7 @@
 # LESSONS
 
+- 2026-09-18: implicit auto-save plus a disabled "New preset" button hid the only saving path from users of externally synced presets. Keep Save preset, Save a copy, auto-save mode and truthful saved/unsaved status beside the selector. External owners require clearly explained export, never a fake saved state or a Studio source overwrite. Delayed saves belong to the preset and state that scheduled them; flush or confirm before navigation, and do not clear edits made while a write yields. Save a copy and project initialization must preserve the current authored settings.
+
 - 2026-09-18: particle birth used raw base size, ignoring the lifetime curve and noise until the first scheduled size write. With `sizeUpdateStep=3`, this visibly defeats a small/zero curve start. Initialize the visible size using the same calculation as later updates; keep the original base size and authored update cadence. Reproduced with one in-memory particle and fixed in v25; never reload the operator's plugin over unsaved preset edits.
 
 - 2026-09-18: distance alone must not reduce visible gameplay particles within 70 studs. Apply the floor in the shared distance multiplier for continuous emission and bursts, preserving the authored fade width. Do not bypass quality, shared budgets, local capacity or viewport culling because an emitter is close to the camera.

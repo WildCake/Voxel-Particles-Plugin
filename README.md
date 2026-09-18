@@ -2,15 +2,30 @@
 
 A Roblox Studio plugin for authoring, previewing, packaging, and installing client-rendered voxel particle emitters. The repository contains the complete editor, runtime, presets, native Script Sync-safe installer, and deterministic `.rbxmx` release builder.
 
-## Download v25
+## Download v26
 
-[Download `VoxelParticlesPlugin-v25.rbxmx`](dist/VoxelParticlesPlugin-v25.rbxmx)
+[Download `VoxelParticlesPlugin-v26.rbxmx`](dist/VoxelParticlesPlugin-v26.rbxmx)
 
-SHA-256: `d151a68a2c8fb777a84007ceb310bd44a1fd352812381c8d4473720ab572c3c1`
+SHA-256: `246c028cef2c5d6e156aa7e1a4f07bd1729d626598f0eab0a58ac9230aa9302e`
 
-Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v25**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
+Install or publish the `.rbxmx` through Roblox Studio's local plugin workflow. Open **Voxel Particles v26**, then use **Initialize/Update project** to install the complete runtime and all 32 bundled presets.
 
-Plugin, runtime, and installer share release number **25**. The builder rejects mixed release numbers.
+Plugin, runtime, and installer share release number **26**. The builder rejects mixed release numbers.
+
+## Saving presets in v26
+
+The saving controls are always beside the preset selector, above the effect settings:
+
+- **Save preset** writes the current settings to the selected project preset. The status shows pending changes, saving, success or a failed write.
+- **Auto-save: ON/OFF** controls automatic saving; ON is the default. It saves 0.3 seconds after the last edit and finishes pending changes before switching emitters or presets. Your choice is remembered. Auto-save changes the shared preset used by all emitters referencing it.
+- **Save a copy** asks for a name, suggests an unused one, saves the current settings as a separate preset and assigns it to the selected emitter. Use this before experimenting if you want to preserve the original.
+- Unsaved changes are protected when selecting another emitter/preset or closing the editor window: keep editing, save, or explicitly discard. Failed writes keep the draft; delayed auto-save cannot write a different selection or mark newer edits as saved.
+
+For an ordinary place, initialize the project once, then use these buttons; no code editing is required. Changes made while previewing a bundled example are retained when initializing the project. Saving a preset updates the open place: **save or publish the place** to preserve it after closing Studio. The unsaved-change dialog does not persist drafts across forced shutdown or plugin reload.
+
+For a preset managed by **Script Sync**, the editor explicitly shows **External file** and offers **Export preset**. It preserves the external owner and does not overwrite synced scripts. The export window names the preset, explains how to locate its file, and provides a select-all button for copying. Exporting does not claim that the original has been saved; when the matching settings arrive from the external file, the editor clears the unsaved indicator. A synced preset folder also prevents creating a copy through Studio. Technical runtime paths and conflicts are under **Project setup details**.
+
+The editor changes need the updated plugin. The gameplay runtime is unchanged apart from the coordinated release marker; there is no game-specific saving mode. API references checked 2026-09-18: [Script Sync](https://create.roblox.com/docs/scripting/sync), [ScriptEditorService](https://create.roblox.com/docs/reference/engine/classes/ScriptEditorService).
 
 ## Size curves at birth in v25
 
@@ -55,7 +70,7 @@ Call `emitter:StopEmission()` when an effect ends naturally. It disables continu
 Updating the installed plugin does not replace runtime scripts already saved in a place. The plugin contains a versioned bundle; each project needs that complete bundle.
 
 1. Stop Play and update the plugin.
-2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for **Voxel Particles runtime v24 is ready**.
+2. For a project without native Script Sync, click **Update project** (or **Initialize project** for a new installation). Wait for the runtime to report ready at the current release version.
 3. For a synced project, update the mapped disk owners together using the files from [this release's Internal folder](PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal):
    - `ReplicatedStorage.Shared`: `VoxelParticleSystem`, `ClientVfxQuality`, `VoxelFairShareAllocator`, `VoxelMotionIntegrator`, `VoxelCubicBezier`, and `VoxelCylinderStream`.
    - `StarterPlayer.StarterPlayerScripts.VoxelEmitterBinder`: use the contents of `VoxelEmitterBinderTemplate.luau` in the existing mapped `VoxelEmitterBinder.local.luau` file.

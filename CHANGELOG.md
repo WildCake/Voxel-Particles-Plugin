@@ -1,5 +1,19 @@
 # Changelog
 
+## v26 — 2026-09-18
+
+- Added a persistent saving panel beside the preset selector: Save preset, Save a copy, Auto-save ON/OFF, Export preset and an explicit save status. Runtime diagnostics are expandable, and the selector uses the available width.
+- Kept automatic saving enabled by default; added a remembered manual mode. Auto-save is debounced and tied to the edited preset/state. Switching selection flushes writable changes or asks before discarding; closing the editor uses the same protection. Failed writes and edits made during a yielding save remain unsaved.
+- Saving a copy suggests an unused name, preserves the original and selects the new preset. Project initialization preserves edits to a bundled example. Matching settings received from an external file clear the dirty indicator.
+- Synced files remain protected. Their primary action opens guided export with the preset's location and a select-all control; exporting does not claim the original is saved. Ordinary project presets require no code editing. UI distinguishes saving the preset in the place from saving/publishing the place itself.
+- Package: one entry, ten internal modules and 32 presets. Plugin, runtime and installer use version 26. The runtime behavior is unchanged; the exact v25 source remains eligible for installation updates.
+
+Release artifact: `dist/VoxelParticlesPlugin-v26.rbxmx`
+
+SHA-256: `246c028cef2c5d6e156aa7e1a4f07bd1729d626598f0eab0a58ac9230aa9302e`
+
+Validation: 21 focused in-memory checks of the actual save owner and saving UI, complete entry compilation, scoped Luau analysis, installer scenarios including v25 updates and synced/custom source protection, and manifest/XML/source validation. Studio visual testing, plugin installation/reload, particle execution, Play and publication were not performed.
+
 ## v25 — 2026-09-18
 
 - Fixed oversized particle births: the initial size now includes the lifetime curve and seeded size noise before the Part becomes visible. Previously spawn used the raw base size until the first `sizeUpdateStep` write.

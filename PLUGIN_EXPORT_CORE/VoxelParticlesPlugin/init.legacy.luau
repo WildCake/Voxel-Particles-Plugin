@@ -37,6 +37,7 @@ local lastPreviewAnchorCFrame
 local destroyPreview
 local applyPreview
 local bindPresetFolder
+local saveFlow
 
 -- These references remain nil until a read-only inspection finds an existing
 -- installation or the operator explicitly initializes the project.
@@ -50,7 +51,7 @@ local RuntimeInstaller = require(Internal:WaitForChild("RuntimeInstaller"))
 local VPS = RuntimeInstaller.VPS
 
 
-local PLUGIN_VERSION = 25
+local PLUGIN_VERSION = 26
 local EMITTER_NAME = "VoxelEmitter"
 local PRESET_ATTRIBUTE = "VoxelPreset"
 local DISPLAY_ATTRIBUTE = "VoxelPresetDisplay"
@@ -714,7 +715,7 @@ addListLayout(presetSelector, Enum.FillDirection.Horizontal)
 
 local presetDropdown = Instance.new("TextButton")
 presetDropdown.Name = "PresetDropdown"
-presetDropdown.Size = UDim2.new(1, -200, 1, 0)
+presetDropdown.Size = UDim2.new(1, 0, 1, 0)
 presetDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 46)
 presetDropdown.BorderSizePixel = 0
 presetDropdown.Text = "Select existing preset"
@@ -752,6 +753,7 @@ statusLabel.TextColor3 = Color3.fromRGB(170, 170, 180)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.TextWrapped = true
 statusLabel.Text = "Select a part named VoxelEmitter to begin."
+statusLabel.LayoutOrder = 2
 statusLabel.Parent = header
 
 local runtimeRoleLabel = Instance.new("TextLabel")
@@ -767,7 +769,19 @@ runtimeRoleLabel.TextXAlignment = Enum.TextXAlignment.Left
 runtimeRoleLabel.TextYAlignment = Enum.TextYAlignment.Top
 runtimeRoleLabel.Text = "Source template (inert ModuleScript): Plugin/Internal/VoxelEmitterBinderTemplate\nInstalled runtime (enabled LocalScript): StarterPlayerScripts/VoxelEmitterBinder"
 runtimeRoleLabel.LayoutOrder = 80
+runtimeRoleLabel.Visible = false
 runtimeRoleLabel.Parent = header
+
+do
+	local details = createButton(header, "Project setup details", function()
+		runtimeRoleLabel.Visible = not runtimeRoleLabel.Visible
+		positionLabel.Visible = runtimeRoleLabel.Visible
+	end)
+	details.Size = UDim2.new(1, 0, 0, 24)
+	details.LayoutOrder = 70
+	positionLabel.Visible = false
+	positionLabel.LayoutOrder = 81
+end
 
 local initializeProjectBtn = Instance.new("TextButton")
 initializeProjectBtn.Name = "InitializeProjectButton"
@@ -820,6 +834,7 @@ local function applyRuntimeInspection(status)
 	end
 	runtimeRoleLabel.Text = roleText
 	initializeProjectBtn.Text = status.action
+	initializeProjectBtn.Visible = not runtimePrepared
 	initializeProjectBtn.Active = not runtimePrepared
 	initializeProjectBtn.Selectable = not runtimePrepared
 	initializeProjectBtn.AutoButtonColor = not runtimePrepared
@@ -856,7 +871,7 @@ local function refreshRuntimeInspection()
 	return runtimePrepared
 end
 
-initializeProjectBtn.MouseButton1Click:Connect(function()
+local function initializeProject()
 	if isPlayMode() then
 		statusLabel.Text = "Stop Play mode before initializing the project runtime."
 		return
@@ -881,8 +896,10 @@ initializeProjectBtn.MouseButton1Click:Connect(function()
 		return
 	end
 	applyRuntimeInspection(statusOrError)
-	statusLabel.Text = "Runtime ready at StarterPlayerScripts.VoxelEmitterBinder"
-end)
+	statusLabel.Text = "Project initialized. Save a copy of your preset to keep your settings."
+end
+
+initializeProjectBtn.MouseButton1Click:Connect(initializeProject)
 
 createEmitterBtn.MouseButton1Click:Connect(function()
 	createEmitterAtCenter()
@@ -1044,7 +1061,7 @@ local namePromptTitle = Instance.new("TextLabel")
 namePromptTitle.BackgroundTransparency = 1
 namePromptTitle.Font = Enum.Font.Gotham
 namePromptTitle.TextSize = 16
-namePromptTitle.Text = "New preset name"
+namePromptTitle.Text = "Save a copy as"
 namePromptTitle.TextColor3 = Color3.fromRGB(230,230,235)
 namePromptTitle.Size = UDim2.new(1, -16, 0, 24)
 namePromptTitle.Position = UDim2.new(0, 8, 0, 8)
@@ -1069,7 +1086,7 @@ btnRow.Size = UDim2.new(1, -16, 0, 28)
 btnRow.Position = UDim2.new(0, 8, 0, 80)
 btnRow.Parent = namePrompt
 
-local createBtn = createButton(btnRow, "Create", function() end)
+local createBtn = createButton(btnRow, "Save", function() end)
 createBtn.Position = UDim2.new(1, -160, 0, 0)
 createBtn.Size = UDim2.new(0, 72, 1, 0)
 createBtn.Parent = btnRow
@@ -1080,13 +1097,15 @@ cancelBtn.Size = UDim2.new(0, 72, 1, 0)
 cancelBtn.Parent = btnRow
 
 local _namePromptCallback
-local function namePromptOpen(onConfirm)
+local function namePromptOpen(onConfirm, suggestedName)
 	_namePromptCallback = onConfirm
-	nameInput.Text = ""
+	nameInput.Text = suggestedName or ""
 	namePrompt.Visible = true
 	modalOverlay.Visible = true
 
 	nameInput:CaptureFocus()
+	nameInput.CursorPosition = #nameInput.Text + 1
+	nameInput.SelectionStart = 1
 end
 local function namePromptClose()
 	namePrompt.Visible = false
@@ -1099,7 +1118,10 @@ createBtn.MouseButton1Click:Connect(function()
 	namePromptClose()
 	if cb then cb((nameInput.Text or ""):gsub("^%s*(.-)%s*$", "%1")) end
 end)
-cancelBtn.MouseButton1Click:Connect(namePromptClose)
+cancelBtn.MouseButton1Click:Connect(function()
+	namePromptClose()
+	if saveFlow then saveFlow.ResumeAutoSave() end
+end)
 nameInput.FocusLost:Connect(function(enterPressed)
 	if enterPressed then
 		local cb = _namePromptCallback
@@ -2067,6 +2089,18 @@ local presetConnections = {}
 local dropdownVisible = false
 previewEmitter = nil
 
+saveFlow = { revision = 0, saving = false, pending = nil, ui = nil, message = nil,
+	automatic = plugin:GetSetting("VoxelParticles_AutoSave") ~= false }
+function saveFlow.CanWrite()
+	local module = selectedPresetItem and selectedPresetItem.module
+	return presetsFolder ~= nil and module ~= nil and module.Parent == presetsFolder
+		and not module:IsDescendantOf(BundledPresets)
+		and not RuntimeInstaller.isFileSynced(presetsFolder) and not RuntimeInstaller.isFileSynced(module)
+end
+function saveFlow.CancelPending()
+	if saveFlow.pending then task.cancel(saveFlow.pending); saveFlow.pending = nil end
+end
+
 
 
 local function clearEmitterConnections()
@@ -2105,6 +2139,15 @@ DEFAULT_DISPLAY_NAME = "Default"
 
 local function updateStatus()
 	local playMode = isPlayMode()
+	if saveFlow.ui then
+		local module = selectedPresetItem and selectedPresetItem.module
+		saveFlow.ui.Update({ available = module ~= nil, editable = not playMode,
+			writable = saveFlow.CanWrite(), canCopy = presetsFolder ~= nil and not RuntimeInstaller.isFileSynced(presetsFolder),
+			dirty = stateDirty, saving = saveFlow.saving, automatic = saveFlow.automatic,
+			external = module ~= nil and (RuntimeInstaller.isFileSynced(module)
+				or (presetsFolder ~= nil and RuntimeInstaller.isFileSynced(presetsFolder))),
+			name = module and module.Name or "preset", message = saveFlow.message })
+	end
 	if refreshRunModeControls then
 		refreshRunModeControls(playMode)
 	end
@@ -2125,15 +2168,11 @@ local function updateStatus()
 			setWidgetTitleDirty()
 			return
 		end
-		table.insert(parts, stateDirty and "Unsaved changes" or "All changes saved")
 		if not currentState.enabled then table.insert(parts, "Emission disabled in this preset")
 		elseif currentState.rate <= 0 then table.insert(parts, "Burst preset: use the Burst control") end
 		if not runtimePrepared then table.insert(parts, "Bundled preview; project runtime needs attention") end
 		if selectedPresetItem and selectedPresetItem.module then
 			table.insert(parts, string.format("Preset: %s", selectedPresetItem.module.Name))
-			if RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
-				table.insert(parts, "Disk-synced preset: preview only")
-			end
 		else
 			table.insert(parts, string.format("Preset: %s", DEFAULT_PRESET_NAME))
 		end
@@ -2153,26 +2192,36 @@ end
 
 local function markDirty()
 	stateDirty = true
+	saveFlow.revision += 1
+	saveFlow.message = nil
 	updateStatus()
 end
 
 local saveCurrentPreset
-local _autosavePending = false
 local function _scheduleAutoSave()
-	if isPlayMode() then return end
-	if not currentEmitter then return end
-	if not selectedPresetItem or not selectedPresetItem.module then return end
-	if selectedPresetItem.module:IsDescendantOf(BundledPresets) or RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
-		updateStatus()
-		return
-	end
-	if _autosavePending then return end
-	_autosavePending = true
-	task.delay(0.3, function()
-		_autosavePending = false
-		-- сохраняем выбранный пресет с текущим state
-		saveCurrentPreset()
+	saveFlow.CancelPending()
+	if isPlayMode() or not stateDirty or not saveFlow.automatic or not saveFlow.CanWrite() or saveFlow.saving then return end
+	local module, state = selectedPresetItem.module, currentState
+	saveFlow.pending = task.delay(0.3, function()
+		saveFlow.pending = nil
+		if selectedPresetItem and selectedPresetItem.module == module and currentState == state then saveCurrentPreset() end
 	end)
+end
+saveFlow.ResumeAutoSave = _scheduleAutoSave
+
+function saveFlow.RequestLeave(proceed)
+	if saveFlow.saving then return end
+	saveFlow.CancelPending()
+	if not stateDirty or (saveFlow.automatic and saveFlow.CanWrite() and saveCurrentPreset()) then
+		proceed()
+	else
+		dropdownVisible = false; dropdownOverlay.Visible = false
+		widget.Enabled = true
+		saveFlow.ui.ConfirmLeave(function()
+			saveFlow.Discard()
+			proceed()
+		end)
+	end
 end
 
 
@@ -2763,6 +2812,8 @@ local function applyPresetItem(item, preserveDisplay)
 	if not item then
 		return
 	end
+	saveFlow.CancelPending()
+	saveFlow.message = nil
 	local newState = deepCopy(item.state)
 	ensureStateIntegrity(newState)
 	currentState = newState
@@ -2777,6 +2828,11 @@ local function applyPresetItem(item, preserveDisplay)
 	updateStatus()
 	applyPreview()
 
+end
+
+function saveFlow.Discard()
+	stateDirty = false; saveFlow.message = nil
+	if selectedPresetItem then applyPresetItem(selectedPresetItem, false) else updateStatus() end
 end
 
 -- VoxelParticlesPlugin.lua
@@ -2815,23 +2871,24 @@ local function rebuildPresetDropdown()
 		button.MouseButton1Click:Connect(function()
 			dropdownVisible = false
 			dropdownOverlay.Visible = false
-			-- выбираем...
-			setSelectedPreset(item)
-			-- ...и СРАЗУ ЖЕ применяем (авто-LOAD)
-			applyPresetItem(item, false)
-			-- закрепляем на эмиттере атрибуты пресета (для рантайм-биндера)
-			if currentEmitter then
-				local ok, err = pcall(function()
-					recordChange("VoxelParticles.SelectPreset", "Select Voxel Preset", function()
-						currentEmitter:SetAttribute(PRESET_ATTRIBUTE, item.module.Name)
-						currentEmitter:SetAttribute(DISPLAY_ATTRIBUTE, currentDisplayName)
+			saveFlow.RequestLeave(function()
+				local nextItem = presetItems[item.module]
+				if not nextItem or not item.module.Parent then return end
+				setSelectedPreset(nextItem)
+				applyPresetItem(nextItem, false)
+				if currentEmitter then
+					local ok, err = pcall(function()
+						recordChange("VoxelParticles.SelectPreset", "Select Voxel Preset", function()
+							currentEmitter:SetAttribute(PRESET_ATTRIBUTE, nextItem.module.Name)
+							currentEmitter:SetAttribute(DISPLAY_ATTRIBUTE, currentDisplayName)
+						end)
 					end)
-				end)
-				if not ok then
-					warn("[VoxelParticlesPlugin] Failed to record preset selection: ", err)
-					statusLabel.Text = "Preset selection failed: " .. tostring(err)
+					if not ok then
+						warn("[VoxelParticlesPlugin] Failed to record preset selection: ", err)
+						statusLabel.Text = "Preset selection failed: " .. tostring(err)
+					end
 				end
-			end
+			end)
 		end)
 	end
 
@@ -2859,6 +2916,13 @@ local function refreshPresetModule(module)
 	if selectedPresetItem and selectedPresetItem.module == module then
 		setSelectedPreset(presetItems[module])
 		if not item then destroyPreview() end
+		if item and not saveFlow.saving then
+			if saveFlow.MatchesSaved and saveFlow.MatchesSaved(item) then
+				stateDirty = false; saveFlow.message = nil; updateStatus()
+			elseif not stateDirty then
+				applyPresetItem(item, false)
+			end
+		end
 	end
 	rebuildPresetDropdown()
 	return presetItems[module]
@@ -3008,16 +3072,31 @@ local function buildModuleSource(moduleName, displayName, state)
 	return table.concat(lines, "\n") .. "\n"
 end
 
+function saveFlow.MatchesSaved(item)
+	local ok, matches = pcall(function()
+		return buildModuleSource(item.module.Name, item.displayName, item.state)
+			== buildModuleSource(item.module.Name, currentDisplayName, currentState)
+	end)
+	return ok and matches
+end
 
 
 
 
-local function setCurrentEmitter(emitter)
+
+local function setCurrentEmitter(emitter, leaveApproved)
 	if emitter == currentEmitter then
 		updateEmitterInfo()
 		return
 	end
+	if not leaveApproved then
+		saveFlow.RequestLeave(function() setCurrentEmitter(emitter, true) end)
+		return
+	end
+	saveFlow.CancelPending()
+	saveFlow.message = nil
 	clearEmitterConnections()
+	namePromptClose()
 	currentEmitter = emitter
 	dropdownVisible = false
 	dropdownOverlay.Visible = false
@@ -3197,80 +3276,49 @@ end
 
 
 saveCurrentPreset = function()
-	if isPlayMode() then
-		statusLabel.Text = "Play mode: presets are read-only."
-		return
-	end
-	if not presetsFolder then
-		statusLabel.Text = "Install project presets before saving, or export the source."
-		return
-	end
-
-	if not currentEmitter then
-		statusLabel.Text = "Select an emitter before saving."
-		return
-	end
-
-	if not selectedPresetItem or not selectedPresetItem.module then
-		statusLabel.Text = "Select or create a preset before saving."
-		return
-	end
-	if selectedPresetItem.module:IsDescendantOf(BundledPresets)
-		or RuntimeInstaller.isFileSynced(presetsFolder) or RuntimeInstaller.isFileSynced(selectedPresetItem.module) then
-		statusLabel.Text = "Preview only: native Script Sync owns this preset. Save through its disk file."
-		return
-	end
-	local moduleName = selectedPresetItem.module.Name
-	currentDisplayName = selectedPresetItem.displayName or moduleName
-
-
-	local module = presetsFolder:FindFirstChild(moduleName)
-	if module and not module:IsA("ModuleScript") then
-		statusLabel.Text = ("Save blocked: %s already exists as %s."):format(moduleName, module.ClassName)
-		return
-	end
+	if isPlayMode() or saveFlow.saving or not saveFlow.CanWrite() then return false end
+	saveFlow.CancelPending()
+	if not stateDirty then return true end
+	local module = selectedPresetItem.module
+	local moduleName, displayName = module.Name, currentDisplayName
+	local emitter, state, revision = currentEmitter, currentState, saveFlow.revision
 
 	-- Build source before opening an undo recording so validation is mutation-free.
 	local ok, sourceOrErr = pcall(function()
-		return buildModuleSource(moduleName, currentDisplayName, currentState)
+		return buildModuleSource(moduleName, displayName, state)
 	end)
 	if not ok then
 		warn("[VoxelParticlesPlugin] Failed to build preset source: ", sourceOrErr)
-		statusLabel.Text = "Save failed: " .. tostring(sourceOrErr)
-		return
+		saveFlow.message = "Not saved: " .. tostring(sourceOrErr)
+		updateStatus()
+		return false
 	end
 
-	local savedModule = module
+	saveFlow.saving = true
+	saveFlow.message = nil
+	updateStatus()
 	local saved, saveError = pcall(function()
 		recordChange("VoxelParticles.SavePreset", "Save Voxel Preset", function()
-			local createdModule = false
-			if not savedModule then
-				savedModule = Instance.new("ModuleScript")
-				savedModule.Name = moduleName
-				savedModule.Parent = presetsFolder
-				createdModule = true
+			RuntimeInstaller.writeScriptSource(module, sourceOrErr)
+			if emitter and emitter.Parent then
+				emitter:SetAttribute(PRESET_ATTRIBUTE, moduleName)
+				emitter:SetAttribute(DISPLAY_ATTRIBUTE, displayName)
 			end
-			local sourceUpdated, sourceError = pcall(RuntimeInstaller.writeScriptSource, savedModule, sourceOrErr)
-			if not sourceUpdated then
-				if createdModule then
-					savedModule:Destroy()
-				end
-				error(sourceError, 0)
-			end
-			currentEmitter:SetAttribute(PRESET_ATTRIBUTE, moduleName)
-			currentEmitter:SetAttribute(DISPLAY_ATTRIBUTE, currentDisplayName)
 		end)
 	end)
+	saveFlow.saving = false
 	if not saved then
 		warn("[VoxelParticlesPlugin] Failed to save preset: ", saveError)
-		statusLabel.Text = "Save failed: " .. tostring(saveError)
-		return
+		saveFlow.message = "Not saved: " .. tostring(saveError)
+		updateStatus()
+		return false
 	end
 
-	stateDirty = false
-	local item = refreshPresetModule(savedModule)
-	setSelectedPreset(item)
+	if currentState == state and saveFlow.revision == revision then stateDirty = false end
+	refreshPresetModule(module)
 	updateStatus()
+	if stateDirty then _scheduleAutoSave() end
+	return not stateDirty
 end
 
 local function isEmitterPart(instance: Instance): boolean
@@ -3309,6 +3357,7 @@ createEmitterAtCenter = function()
 		statusLabel.Text = "Play mode: emitters cannot be created."
 		return
 	end
+	saveFlow.RequestLeave(function()
 	local ok, partOrError = pcall(function()
 		return recordChange("VoxelParticles.CreateEmitter", "Create Voxel Emitter", function()
 			local part = Instance.new("Part")
@@ -3337,6 +3386,7 @@ createEmitterAtCenter = function()
 	setCurrentEmitter(part)
 
 	statusLabel.Text = string.format("Emitter created: %s", part:GetFullName())
+	end)
 end
 
 -- === Live preview of VoxelParticleSystem in Studio ===
@@ -3492,6 +3542,7 @@ displayNameBox.FocusLost:Connect(function()
 		currentDisplayName = text
 		if currentEmitter then
 			markDirty()
+			_scheduleAutoSave()
 		end
 	end
 	displayNameBox.Text = currentDisplayName
@@ -3523,8 +3574,7 @@ end)
 
 
 
--- New preset button
-local newPresetBtn = createButton(actionsRow, "New preset", function()
+local function savePresetCopy()
 	if isPlayMode() then
 		statusLabel.Text = "Play mode: presets are read-only."
 		return
@@ -3538,17 +3588,31 @@ local newPresetBtn = createButton(actionsRow, "New preset", function()
 		return
 	end
 
+	saveFlow.CancelPending()
+	local baseName = selectedPresetItem and selectedPresetItem.module.Name or "MyPreset"
+	local suggestion = baseName .. "Copy"
+	for index = 2, #presetsFolder:GetChildren() + 2 do
+		if not presetsFolder:FindFirstChild(suggestion) then break end
+		suggestion = baseName .. "Copy" .. tostring(index)
+	end
 	namePromptOpen(function(name)
-		if not name or name == "" then return end
+		if isPlayMode() or saveFlow.saving then return end
+		if not presetsFolder or RuntimeInstaller.isFileSynced(presetsFolder) then
+			saveFlow.message = "Not saved: this preset folder is now managed by Script Sync. Use Export preset."
+			updateStatus(); return
+		end
+		if not name or name == "" then _scheduleAutoSave(); return end
 		name = name:gsub("^%s*(.-)%s*$", "%1")
-		if name == "" then return end
+		if name == "" then _scheduleAutoSave(); return end
 
 		if presetsFolder:FindFirstChild(name) then
-			statusLabel.Text = ("Preset '%s' already exists."):format(name)
+			saveFlow.message = ("Copy not saved: '%s' already exists. Choose another name."):format(name)
+			updateStatus()
 			return
 		end
 
 		local fromState = currentState and deepCopy(currentState) or defaultState()
+		local emitter, revision = currentEmitter, saveFlow.revision
 		local ok, srcOrErr = pcall(function()
 			return buildModuleSource(name, name, fromState)
 		end)
@@ -3558,6 +3622,7 @@ local newPresetBtn = createButton(actionsRow, "New preset", function()
 		end
 
 		local mod = nil
+		saveFlow.saving = true; updateStatus()
 		local created, createError = pcall(function()
 			recordChange("VoxelParticles.CreatePreset", "Create Voxel Preset", function()
 				mod = Instance.new("ModuleScript")
@@ -3568,49 +3633,55 @@ local newPresetBtn = createButton(actionsRow, "New preset", function()
 					mod:Destroy()
 					error(sourceError, 0)
 				end
-				if currentEmitter then
-					currentEmitter:SetAttribute(PRESET_ATTRIBUTE, name)
-					currentEmitter:SetAttribute(DISPLAY_ATTRIBUTE, name)
+				if emitter and emitter.Parent then
+					emitter:SetAttribute(PRESET_ATTRIBUTE, name)
+					emitter:SetAttribute(DISPLAY_ATTRIBUTE, name)
 				end
 			end)
 		end)
+		saveFlow.saving = false
 		if not created then
 			warn("[VoxelParticlesPlugin] Failed to create preset: ", createError)
-			statusLabel.Text = "Create failed: " .. tostring(createError)
+			saveFlow.message = "Copy not saved: " .. tostring(createError)
+			updateStatus()
 			return
 		end
 
 		-- Parse only after ScriptEditorService has committed the new source.
 		local item = refreshPresetModule(mod)
+		currentDisplayName = name
+		displayNameBox.Text = name; presetNameBox.Text = name
+		stateDirty = revision ~= saveFlow.revision
+		saveFlow.message = nil
 		setSelectedPreset(item)
-		statusLabel.Text = ("Preset created: %s"):format(name)
-	end)
-end)
+		if stateDirty then _scheduleAutoSave() end
+	end, suggestion)
+end
 
-newPresetBtn.Parent = actionsRow
-
-createButton(actionsRow, "Export source", function()
-	if not currentEmitter or not selectedPresetItem then
+local function exportCurrentPreset()
+	if not selectedPresetItem then
 		statusLabel.Text = "Select an emitter and a valid preset to export."
 		return
 	end
 	local name = selectedPresetItem.module.Name
 	local ok, source = pcall(buildModuleSource, name, currentDisplayName, currentState)
-	if ok then sourceExport.Show(name, source)
+	if ok then sourceExport.Show(name, source, selectedPresetItem.module:GetFullName())
 	else statusLabel.Text = "Export failed: " .. tostring(source) end
-end)
-
-for _, button in ipairs(actionsRow:GetChildren()) do
-	if button:IsA("TextButton") then
-		button.Size = UDim2.new(1 / 3, -6, 1, 0)
-		button.TextSize = 12
-	end
 end
+
+createEmitterBtn.Size = UDim2.new(1, 0, 1, 0)
+saveFlow.ui = require(Internal:WaitForChild("PresetSaveControls")).Create(header, widget, {
+	Save = saveCurrentPreset, Copy = savePresetCopy, Export = exportCurrentPreset,
+	SetAutomatic = function(enabled)
+		saveFlow.automatic = enabled
+		plugin:SetSetting("VoxelParticles_AutoSave", enabled)
+		_scheduleAutoSave(); updateStatus()
+	end,
+})
 
 local textBoxBaseColor = displayNameBox.BackgroundColor3
 local presetDropdownBaseColor = presetDropdown.BackgroundColor3
 local createEmitterBaseColor = createEmitterBtn.BackgroundColor3
-local newPresetBaseColor = newPresetBtn.BackgroundColor3
 
 refreshRunModeControls = function(playMode)
 	local editable = not playMode
@@ -3631,8 +3702,6 @@ refreshRunModeControls = function(playMode)
 
 	setButtonEnabled(presetDropdown, presetDropdownBaseColor, editable)
 	setButtonEnabled(createEmitterBtn, createEmitterBaseColor, editable)
-	newPresetBtn.Text = "New preset"
-	setButtonEnabled(newPresetBtn, newPresetBaseColor, presetFolderWritable)
 	setButtonEnabled(playbackButton, previewPlaying and STOP_COLOR or SAVE_COLOR, editable)
 	if burstButton then setButtonEnabled(burstButton, Color3.fromRGB(90, 140, 255), editable) end
 	if playMode then
@@ -3672,8 +3741,12 @@ end
 
 
 toggleButton.Click:Connect(function()
-	local enabling = not widget.Enabled
-	widget.Enabled = enabling
+	if widget.Enabled then saveFlow.RequestLeave(function() widget.Enabled = false end)
+	else widget.Enabled = true end
+end)
+
+widget:BindToClose(function()
+	saveFlow.RequestLeave(function() widget.Enabled = false end)
 end)
 
 widget:GetPropertyChangedSignal("Enabled"):Connect(function()
@@ -3704,6 +3777,9 @@ bindPresetFolder = function(folder)
 	if folder == activePresetFolder then
 		return
 	end
+	-- Installing the project moves the selected built-in example to the project
+	-- library. Keep the current authoring state until the user explicitly saves it.
+	local preserveEdits = stateDirty
 	for _, connection in ipairs(presetFolderConnections) do
 		connection:Disconnect()
 	end
@@ -3743,7 +3819,9 @@ bindPresetFolder = function(folder)
 		local module = typeof(name) == "string" and folder:FindFirstChild(name)
 		local item = module and presetItems[module]
 		setSelectedPreset(item)
-		if item then applyPresetItem(item, true) else destroyPreview() end
+		if item then
+			if preserveEdits then updateStatus(); applyPreview() else applyPresetItem(item, true) end
+		else destroyPreview() end
 	end
 end
 
@@ -3795,6 +3873,8 @@ updateStatus()
 updatePlaybackButton()
 
 plugin.Unloading:Connect(function()
+	saveFlow.CancelPending()
+	saveFlow.ui.Destroy()
 	sourceExport.Destroy()
 	stopBurstLoop()
 	destroyPreview()

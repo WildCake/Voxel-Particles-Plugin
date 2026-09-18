@@ -88,6 +88,14 @@
               "children": []
             },
             {
+              "name": "PresetSaveControls",
+              "className": "ModuleScript",
+              "filePaths": [
+                "PLUGIN_EXPORT_CORE/VoxelParticlesPlugin/Internal/PresetSaveControls.luau"
+              ],
+              "children": []
+            },
+            {
               "name": "BundledPresets",
               "className": "Folder",
               "filePaths": [],
